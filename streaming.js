@@ -47,7 +47,7 @@ const seriesGroups = () => groups.filter(entry => entry.items.some(candidate => 
 const originalGroup = () => groups.findIndex(entry => !entry.items.some(candidate => candidate.series));
 function homeItems() {
   const items = resumeEntries().slice(0, 3).map(entry => ({ kind: 'resume', item: entry.item, elapsed: entry.elapsed, duration: entry.duration }));
-  items.push({ kind: 'series' });
+  if (seriesGroups().length) items.push({ kind: 'series' });
   const original = originalGroup();
   if (original >= 0) items.push({ kind: 'original', group: original });
   items.push({ kind: 'mylist' }, { kind: 'options' });
@@ -242,7 +242,7 @@ select = function() {
   }
   if (view === 'serieslist') {
     const list = seriesGroups();
-    if (!list.length) return;
+    if (!list.length) { back(); return; }
     group = groups.indexOf(list[seriesListIndex]);
     index = 0; view = 'series'; render(); announce(groups[group].name); return;
   }
@@ -296,7 +296,7 @@ select = function() {
 back = function() {
   if (!groups.length) return baseBack();
   if (view === 'player') { remember(); ended = null; }
-  if (view === 'home') { view = 'about'; render(); announce('About pocket cinema.'); return; }
+  if (view === 'home') { previous = 'home'; view = 'about'; render(); announce('About pocket cinema.'); return; }
   if (view === 'serieslist' || view === 'options' || view === 'mylist') { view = 'home'; render(); announce('Home.'); return; }
   if (view === 'series') { view = 'serieslist'; render(); announce('Series.'); return; }
   if (view === 'episodes') {
@@ -307,6 +307,9 @@ back = function() {
   if (view === 'details') { view = returnView; render(); announce(view === 'home' ? 'Home.' : 'Back.'); return; }
   if (view === 'ended') { ended = null; view = 'episodes'; render(); announce('Episodes.'); return; }
   baseBack();
+  if (returnView === 'home') { view = 'home'; render(); announce('Home.'); return; }
+  if (returnView === 'series') { view = 'series'; render(); announce(groups[group]?.name || 'Series.'); return; }
+  if (returnView === 'mylist') { view = 'mylist'; render(); announce('My list.'); return; }
 };
 key = function(value) {
   if (value === '*') {
@@ -314,6 +317,7 @@ key = function(value) {
     ++token; setPlaying(false); clip = null; ended = null; view = 'home'; homeIndex = 0;
     render(); announce('Home.'); return;
   }
+  if (view !== 'player' && (value === '4' || value === '6')) return;
   const up = value === '2', down = value === '8';
   if (view === 'home' && (up || down)) {
     const items = homeItems();
