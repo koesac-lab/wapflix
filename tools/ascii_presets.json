@@ -1,0 +1,56 @@
+{
+  "baseline-current": {
+    "columns": 40,
+    "crop": "none",
+    "brightness": 0.0,
+    "contrast": 1.0,
+    "gamma": 1.0,
+    "black_point": 0.0,
+    "white_point": 1.0,
+    "invert": false,
+    "ramp": " .,:;irsXA253hMHGS#9B&@",
+    "levels": 10,
+    "fps": 6
+  },
+  "corrected-polarity": {
+    "columns": 40,
+    "crop": "none",
+    "brightness": 0.0,
+    "contrast": 1.15,
+    "gamma": 1.0,
+    "black_point": 0.03,
+    "white_point": 0.97,
+    "invert": true,
+    "ramp": " .:-=+*#%@",
+    "levels": 10,
+    "fps": 6
+  },
+  "wide-80": {
+    "columns": 80,
+    "crop": "none",
+    "brightness": 0.0,
+    "contrast": 1.15,
+    "gamma": 1.0,
+    "black_point": 0.03,
+    "white_point": 0.97,
+    "invert": true,
+    "ramp": " .:-=+*#%@",
+    "levels": 10,
+    "fps": 6
+  },
+  "subject-crop": {
+    "columns": 60,
+    "crop": "centre",
+    "crop_width": 0.72,
+    "crop_height": 0.72,
+    "brightness": 0.02,
+    "contrast": 1.25,
+    "gamma": 0.92,
+    "black_point": 0.04,
+    "white_point": 0.96,
+    "invert": true,
+    "ramp": " .:-=+*#%@",
+    "levels": 8,
+    "fps": 8
+  }
+}
