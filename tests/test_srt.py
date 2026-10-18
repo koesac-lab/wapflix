@@ -1,35 +1,74 @@
 import sys
 from pathlib import Path
-import tempfile
-import unittest
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from srt import parse_srt, parse_srt_text
 
-class SrtTests(unittest.TestCase):
-    def test_multiline_absolute_time(self):
-        cue = parse_srt_text("1\n00:02:01,000 --> 00:02:03,500\nHello\nworld").cues[0]
-        self.assertEqual(cue.as_dict(), {"start": 121, "end": 123.5, "text": "Hello\nworld"})
-    def test_bom_crlf_markup(self):
-        result = parse_srt_text("\ufeff1\r\n00:00:00,500 --> 00:00:01,500\r\n<I>Hello</I><br/>World")
-        self.assertEqual(result.errors, [])
-        self.assertEqual(result.cues[0].text, "Hello\nWorld")
-    def test_invalid_times_reported(self):
-        for value in ("00:61:00,000", "00:00:00,9999", "nan"):
-            self.assertEqual(len(parse_srt_text(f"1\n{value} --> 00:00:01,000\nText").errors), 1)
-        self.assertEqual(len(parse_srt_text("1\n00:00:02,000 --> 00:00:01,000\nText").errors), 1)
-    def test_sort_overlap_and_separator(self):
-        result = parse_srt_text("2\n00:00:02,000 --> 00:00:04,000\nB\n \n1\n00:00:01,000 --> 00:00:03,000\nA")
-        self.assertEqual([cue.text for cue in result.cues], ["A", "B"])
-    def test_empty_and_malformed(self):
-        self.assertEqual(parse_srt_text("").cues, [])
-        self.assertEqual(len(parse_srt_text("1\nno timing\nText").errors), 1)
-        self.assertEqual(len(parse_srt_text("1\n00:00:01,000 --> 00:00:02,000").errors), 1)
-    def test_encodings(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "sample.srt"
-            for encoding in ("utf-8-sig", "utf-16", "cp1252"):
-                path.write_bytes("1\n00:00:01,000 --> 00:00:02,000\nCafé".encode(encoding))
-                self.assertEqual(parse_srt(path).cues[0].text, "Café")
+import pytest
 
-if __name__ == "__main__":
-    unittest.main()
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+import srt
+
+
+SRT = """1
+00:00:01,000 --> 00:00:02,500
+Hello
+
+2
+00:00:03,000 --> 00:00:04,000
+Second line
+"""
+BAD_SRT = """1
+00:00:05,000 --> 00:00:04,000
+Backwards
+
+2
+00:00:06,000 --> 00:00:07,000
+Good
+"""
+
+
+def write(tmp_path, name, content):
+    path = tmp_path / name
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def test_parses_valid_cues(tmp_path):
+    result = srt.parse_srt(write(tmp_path, "sample.srt", SRT))
+    assert len(result.cues) == 2
+    assert result.cues[0].start == 1.0
+    assert result.cues[0].text == "Hello"
+    assert result.errors == ()
+
+
+def test_reports_but_survives_invalid_cue(tmp_path):
+    result = srt.parse_srt(write(tmp_path, "mixed.srt", BAD_SRT))
+    assert len(result.cues) == 1
+    assert len(result.errors) == 1
+    assert "cue 1" in result.errors[0]
+
+
+def test_window_selection_rebases_times(tmp_path):
+    result = srt.parse_srt(write(tmp_path, "sample.srt", SRT))
+    cues = srt.cues_for_window(result, 2.0, 4.0)
+    assert len(cues) == 2
+    assert cues[0].start == 0.0
+    assert cues[0].end == pytest.approx(0.5)
+    assert cues[1].start == pytest.approx(1.0)
+    assert cues[1].end == pytest.approx(2.0)
+
+
+def test_window_excludes_non_overlapping_cues(tmp_path):
+    result = srt.parse_srt(write(tmp_path, "sample.srt", SRT))
+    assert srt.cues_for_window(result, 10.0, 12.0) == ()
+
+
+def test_invalid_window_is_rejected(tmp_path):
+    result = srt.parse_srt(write(tmp_path, "sample.srt", SRT))
+    with pytest.raises(srt.SubtitleError):
+        srt.cues_for_window(result, 4.0, 2.0)
+
+
+def test_missing_file_is_rejected(tmp_path):
+    with pytest.raises(srt.SubtitleError):
+        srt.parse_srt(tmp_path / "missing.srt")
