@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Test phone scenes
+        run: python -m unittest discover -s tests
       - name: Build static cinema
         run: |
           mkdir -p _site/assets
@@ -27,6 +29,7 @@ jobs:
           python tools/build.py --output _site/assets
           python tools/catalogue.py --output _site/assets
           python tools/presentation.py --output _site
+          python tools/phone_video.py --output _site
       - uses: actions/configure-pages@v5
         with:
           enablement: true
