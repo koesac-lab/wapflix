@@ -26,6 +26,7 @@ jobs:
           if [ -d assets ]; then cp -R assets/. _site/assets/; fi
           python tools/build.py --output _site/assets
           python tools/catalogue.py --output _site/assets
+          python tools/presentation.py --output _site
       - uses: actions/configure-pages@v5
         with:
           enablement: true
