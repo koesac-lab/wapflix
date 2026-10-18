@@ -118,12 +118,15 @@ def main():
     root = Path(__file__).resolve().parents[1]
     shutil.copyfile(root/'player.js',args.output/'player.js')
     shutil.copyfile(root/'streaming.js',args.output/'streaming.js')
+    shutil.copyfile(root/'themes.css',args.output/'themes.css')
+    shutil.copyfile(root/'theme.js',args.output/'theme.js')
     index = args.output/'index.html'
     source = index.read_text()
     anchor = '<script src="./sharing.js" defer></script>'
     if source.count(anchor) != 1:
         raise ValueError('Expected the sharing build to run before phone_video.py')
-    source = source.replace(anchor,'<script src="./player.js?v=lcd2" defer></script><script src="./streaming.js?v=1" defer></script>'+anchor,1)
+    source = source.replace('</head>','<link rel="stylesheet" href="./themes.css"></head>',1)
+    source = source.replace(anchor,'<script src="./player.js?v=lcd2" defer></script><script src="./streaming.js?v=1" defer></script><script src="./theme.js?v=1" defer></script>'+anchor,1)
     index.write_text(source)
     print(f'Recomposed {count} demo clips for a native 240x200 LCD scene area.')
 

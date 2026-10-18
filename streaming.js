@@ -181,7 +181,7 @@ function detailsRender() {
 function optionsRender() {
   header();
   center('OPTIONS', 24);
-  const rows = ['AUTOPLAY NEXT: ' + (state.autoplayNext ? 'ON' : 'OFF'), 'CONNECTION: ' + labels[quality], 'BACKLIGHT: ' + (lit ? 'ON' : 'OFF'), 'ABOUT WAPFLIX'];
+  const rows = ['AUTOPLAY NEXT: ' + (state.autoplayNext ? 'ON' : 'OFF'), 'HANDSET: ' + (window.wapflixHandset ? window.wapflixHandset.current() : 'NOKIA 3310'), 'CONNECTION: ' + labels[quality], 'BACKLIGHT: ' + (lit ? 'ON' : 'OFF'), 'ABOUT WAPFLIX'];
   optionIndex = Math.min(optionIndex, rows.length - 1);
   rows.forEach((label, n) => menuItem(label, n + 2, n === optionIndex));
   footer('SELECT', 'BACK');
@@ -277,12 +277,13 @@ select = function() {
   }
   if (view === 'options') {
     if (optionIndex === 0) { state.autoplayNext = !state.autoplayNext; persist(); }
-    else if (optionIndex === 1) { quality = (quality + 1) % 3; }
-    else if (optionIndex === 2) {
+    else if (optionIndex === 1) { const name = window.wapflixHandset ? window.wapflixHandset.cycle() : 'NOKIA 3310'; announce('Handset ' + name + '.'); render(); return; }
+    else if (optionIndex === 2) { quality = (quality + 1) % 3; }
+    else if (optionIndex === 3) {
       lit = !lit;
       $('lcd').classList.toggle('dim', !lit);
       document.querySelector('[data-key="#"]').setAttribute('aria-pressed', String(lit));
-    } else { previous = 'home'; view = 'about'; render(); announce('About pocket cinema.'); return; }
+    } else if (optionIndex === 4) { previous = 'home'; view = 'about'; render(); announce('About pocket cinema.'); return; }
     render(); return;
   }
   if (view === 'ended') {
@@ -348,7 +349,7 @@ key = function(value) {
     render(); return;
   }
   if (view === 'options' && (up || down)) {
-    optionIndex = (optionIndex + (up ? -1 : 1) + 4) % 4;
+    optionIndex = (optionIndex + (up ? -1 : 1) + 5) % 5;
     render(); return;
   }
   baseKey(value);

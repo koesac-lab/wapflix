@@ -1,0 +1,22 @@
+/* Handset themes: 3310, 8210, 6310, 7110, 3210 */
+body.handset-3310 .phone{background:linear-gradient(180deg,#2b3a52,#1d2b40);border-color:#41546f}
+body.handset-3310 .key{background:#41546f;border-color:#7286a3;border-bottom-color:#16233a}
+body.handset-3310 .ok{background:#4f6484}
+
+body.handset-8210 .phone{background:linear-gradient(180deg,#3a3a3a,#232323);border-color:#555}
+body.handset-8210 .key{background:#4a4a4a;border-color:#777;border-bottom-color:#1a1a1a}
+body.handset-8210 .ok{background:#5a5a5a}
+
+body.handset-6310 .phone{background:linear-gradient(180deg,#4a3f33,#2f2820);border-color:#6b5a45}
+body.handset-6310 .key{background:#5c4f3d;border-color:#8a765a;border-bottom-color:#241d14}
+body.handset-6310 .ok{background:#6b5a45}
+
+body.handset-7110 .phone{background:linear-gradient(180deg,#1f3d2e,#14291f);border-color:#2f5c44}
+body.handset-7110 .key{background:#2f5c44;border-color:#4a8a67;border-bottom-color:#122b1e}
+body.handset-7110 .nav{gap:5px}
+body.handset-7110 .nav .key{border-radius:18px 18px 50% 50%}
+body.handset-7110 .ok{background:#3a7052;border-radius:30px}
+
+body.handset-3210 .phone{background:linear-gradient(180deg,#4a2f3f,#2f1d28);border-color:#6b455a}
+body.handset-3210 .key{background:#5c3d4f;border-color:#8a5a76;border-bottom-color:#241420}
+body.handset-3210 .ok{background:#6b455a}
