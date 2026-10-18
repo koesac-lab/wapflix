@@ -22,5 +22,29 @@
         "bytes": 73103
       }
     }
+  },
+  {
+    "id": "test-video-full",
+    "title": "Video test / full",
+    "description": "Full-length real video converted into ASCII. Captioned playback test.",
+    "label": "ORIGINAL / TRANSMISSION",
+    "poster": "      MMMMMMhArh3555552255553hMMMMMMMHHHHM      \n      MMMMMMMXshh3555522222253MMMMMMMHHHHH      \n      MMMMMMMXXMMM522255555553MMMMMMMHHHHH      \n      MMMMMMMsAMMMM52222533333hMMMMMHHHHHH      \n      MMMMMMMs2MMMMh2222255555rAMMMMMHHHHH      \n      hhhhhhhr2MhhMh222555555X::2MMMMMHHHH      \n      hhhhhh3r5hhh32sXXXXssr;,,:ihMMMMMMHH      \n      hhhhhh3r5hh3A;,.,.,:::::iX3MMMMMHHHH      \n      hhhhhh5r335Xi;,,,,:;rAA55333hhhMMMMM      \n      MMMMMh5s5r::;;;;::isXXA25533hhhhhhMh      \n      MMhhhh5X2riiirsXA2333333333hhhhhMMMM      \n      hhhhhh5233333hhhhhhhhhhMMMMMMMHHHHMM      \n      hhhhhh52hhhhhhhhhhhhhhhMMMMMMMHHHHMM      \n      5222AAXXAA22553hhhhhhhMMMMMMMMhMMMMM      ",
+    "variants": {
+      "low": {
+        "path": "assets/test-video-full-low.json.gz",
+        "fallback": "assets/test-video-full-low.json",
+        "bytes": 168939
+      },
+      "medium": {
+        "path": "assets/test-video-full-medium.json.gz",
+        "fallback": "assets/test-video-full-medium.json",
+        "bytes": 462211
+      },
+      "high": {
+        "path": "assets/test-video-full-high.json.gz",
+        "fallback": "assets/test-video-full-high.json",
+        "bytes": 981447
+      }
+    }
   }
 ]
