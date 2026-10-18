@@ -126,7 +126,7 @@ def main():
     if source.count(anchor) != 1:
         raise ValueError('Expected the sharing build to run before phone_video.py')
     source = source.replace('</head>','<link rel="stylesheet" href="./themes.css"></head>',1)
-    source = source.replace(anchor,'<script src="./player.js?v=lcd2" defer></script><script src="./streaming.js?v=1" defer></script><script src="./theme.js?v=1" defer></script>'+anchor,1)
+    source = source.replace(anchor,'<script src="./player.js?v=lcd2" defer></script><script src="./streaming.js?v=nav3" defer></script><script src="./theme.js?v=1" defer></script>'+anchor,1)
     index.write_text(source)
     print(f'Recomposed {count} demo clips for a native 240x200 LCD scene area.')
 
