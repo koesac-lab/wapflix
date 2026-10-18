@@ -6,7 +6,7 @@ site, the progressive playback server, or any committed scene assets.
 
 Usage:
   python3 tools/ascii_tuning_lab.py --video path/to/video.mp4 --preset corrected-polarity
-  python3 tools/ascii_tuning_lab.py --video path/to/video.mp4 --start 12 --seconds 4
+  python3 tools/ascii_tuning_lab.py --video video.mp4 --srt video.srt --start 30 --seconds 15
 """
 from __future__ import annotations
 
@@ -19,10 +19,12 @@ import sys
 import tempfile
 from pathlib import Path
 
+import srt
+
 PRESETS_PATH = Path(__file__).with_name("ascii_presets.json")
-DEFAULT_RAMP = " .:-=+*#%@"
 MAX_PREVIEW_FRAMES = 240
 MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024
+MAX_PREVIEW_SECONDS = 30
 
 
 class LabError(ValueError):
@@ -109,7 +111,6 @@ def probe_video(video: Path, ffprobe: str) -> dict:
 
 
 def rows_for_columns(columns: int, width: int, height: int) -> int:
-    # Character cells are approximately 1:2 width:height.
     rows = max(2, round(columns * height / (2 * width)))
     if rows > 120:
         raise LabError("Derived row count is too large for legible preview output")
@@ -169,11 +170,20 @@ def calibration_strip(preset: dict, columns: int = 40) -> list[str]:
     return to_ascii(values, preset)
 
 
+def active_cue(cues: tuple[srt.SubtitleCue, ...], position: float) -> str | None:
+    for cue in cues:
+        if cue.start <= position < cue.end:
+            return cue.text
+    return None
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--video", type=Path, required=True, help="Local video file")
+    parser.add_argument("--srt", type=Path, help="Optional local SRT subtitle file")
     parser.add_argument("--preset", default="corrected-polarity")
     parser.add_argument("--start", type=float, default=0.0)
+    parser.add_argument("--seconds", type=float, help="Preview duration; defaults to frames divided by preset FPS")
     parser.add_argument("--frames", type=int, default=1)
     parser.add_argument("--presets", type=Path, default=PRESETS_PATH)
     parser.add_argument("--output-dir", type=Path, default=Path("output/ascii-lab"))
@@ -191,28 +201,69 @@ def main(argv: list[str] | None = None) -> int:
             raise LabError("Frame count must be between 1 and 240")
         if not math.isfinite(args.start) or args.start < 0:
             raise LabError("Start time must be non-negative")
+        seconds = args.seconds if args.seconds is not None else args.frames / preset["fps"]
+        if not math.isfinite(seconds) or not 0 < seconds <= MAX_PREVIEW_SECONDS:
+            raise LabError(f"Preview duration must be between 0 and {MAX_PREVIEW_SECONDS} seconds")
+        expected_frames = max(1, min(MAX_PREVIEW_FRAMES, math.ceil(seconds * preset["fps"])))
+        if args.frames != expected_frames:
+            raise LabError(f"--frames must be {expected_frames} for a {seconds:g}-second preview at {preset['fps']} fps")
+        subtitles = None
+        if args.srt is not None:
+            subtitles = srt.parse_srt(args.srt)
+            cues = srt.cues_for_window(subtitles, args.start, args.start + seconds)
+        else:
+            cues = ()
         ffmpeg, ffprobe = require_tool("ffmpeg"), require_tool("ffprobe")
         info = probe_video(args.video.resolve(), ffprobe)
-        if args.start >= info["duration"]:
-            raise LabError("Start time is beyond the end of the video")
+        if args.start + seconds > info["duration"]:
+            raise LabError("Requested preview extends beyond the end of the video")
         rows = rows_for_columns(preset["columns"], info["width"], info["height"])
         args.output_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "version": 1,
+            "video": str(args.video.resolve()),
+            "srt": str(args.srt.resolve()) if args.srt else None,
+            "preset": args.preset,
+            "start": args.start,
+            "seconds": seconds,
+            "fps": preset["fps"],
+            "columns": preset["columns"],
+            "rows": rows,
+            "frames": [],
+            "subtitle_errors": list(subtitles.errors) if subtitles else [],
+        }
         with tempfile.TemporaryDirectory(prefix="wapflix-ascii-lab-") as temporary:
             frame_path = Path(temporary) / "frame.png"
             for index in range(args.frames):
-                extract_frame(args.video, args.start + index / preset["fps"], ffmpeg,
+                source_time = args.start + index / preset["fps"]
+                extract_frame(args.video, source_time, ffmpeg,
                               preset["columns"], rows, preset, frame_path)
                 destination = args.output_dir / f"frame-{index:04d}.png"
                 shutil.copyfile(frame_path, destination)
+                cue = active_cue(cues, index / preset["fps"])
+                text_path = args.output_dir / f"frame-{index:04d}.txt"
+                text_path.write_text((cue or ""), encoding="utf-8")
+                manifest["frames"].append({
+                    "file": destination.name,
+                    "source_time": source_time,
+                    "preview_time": index / preset["fps"],
+                    "cue": cue,
+                })
+        manifest_path = args.output_dir / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         strip = calibration_strip(preset)
         print(f"Preset: {args.preset}")
         print(f"Grid: {preset['columns']} x {rows}")
+        print(f"Preview: {args.start:.3f}s for {seconds:.3f}s")
         print(f"Frames written: {args.frames}")
+        print(f"Subtitles: {len(cues)} overlapping cue(s)")
+        if subtitles and subtitles.errors:
+            print(f"Subtitle warnings: {len(subtitles.errors)}")
         print(f"Output: {args.output_dir}")
         print("Calibration strip:")
         print("\n".join(strip))
         return 0
-    except LabError as exc:
+    except (LabError, srt.SubtitleError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
