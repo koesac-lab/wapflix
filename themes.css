@@ -1,22 +1,28 @@
-/* Handset themes: 3310, 8210, 6310, 7110, 3210 */
-body.handset-3310 .phone{background:linear-gradient(180deg,#2b3a52,#1d2b40);border-color:#41546f}
-body.handset-3310 .key{background:#41546f;border-color:#7286a3;border-bottom-color:#16233a}
-body.handset-3310 .ok{background:#4f6484}
+/* Handset themes: geometry, not just colour */
+body.handset-3310 .phone{background:linear-gradient(180deg,#2b3a52,#1d2b40);border-color:#41546f;border-radius:44px 44px 60px 60px}
+body.handset-3310 .key{background:#41546f;border-color:#7286a3;border-bottom-color:#16233a;border-radius:14px 14px 20px 20px}
+body.handset-3310 .ok{background:#4f6484;border-radius:24px}
+body.handset-3310 .nav{gap:9px}
 
-body.handset-8210 .phone{background:linear-gradient(180deg,#3a3a3a,#232323);border-color:#555}
-body.handset-8210 .key{background:#4a4a4a;border-color:#777;border-bottom-color:#1a1a1a}
-body.handset-8210 .ok{background:#5a5a5a}
+body.handset-8210 .phone{background:linear-gradient(180deg,#3a3a3a,#232323);border-color:#555;border-radius:30px 30px 40px 40px}
+body.handset-8210 .key{background:#4a4a4a;border-color:#777;border-bottom-color:#1a1a1a;border-radius:6px;min-height:38px}
+body.handset-8210 .ok{background:#5a5a5a;border-radius:8px}
+body.handset-8210 .nav{gap:6px}
+body.handset-8210 .nav .key{font-size:13px}
 
-body.handset-6310 .phone{background:linear-gradient(180deg,#4a3f33,#2f2820);border-color:#6b5a45}
-body.handset-6310 .key{background:#5c4f3d;border-color:#8a765a;border-bottom-color:#241d14}
-body.handset-6310 .ok{background:#6b5a45}
+body.handset-6310 .phone{background:linear-gradient(180deg,#4a3f33,#2f2820);border-color:#6b5a45;border-radius:36px 36px 50px 50px}
+body.handset-6310 .key{background:#5c4f3d;border-color:#8a765a;border-bottom-color:#241d14;border-radius:18px}
+body.handset-6310 .nav{grid-template-columns:1fr 1fr 1fr;gap:7px}
+body.handset-6310 .nav .key{border-radius:50%;min-height:52px}
+body.handset-6310 .ok{background:#6b5a45;border-radius:50%;height:64px}
 
-body.handset-7110 .phone{background:linear-gradient(180deg,#1f3d2e,#14291f);border-color:#2f5c44}
-body.handset-7110 .key{background:#2f5c44;border-color:#4a8a67;border-bottom-color:#122b1e}
-body.handset-7110 .nav{gap:5px}
-body.handset-7110 .nav .key{border-radius:18px 18px 50% 50%}
-body.handset-7110 .ok{background:#3a7052;border-radius:30px}
+body.handset-7110 .phone{background:linear-gradient(180deg,#1f3d2e,#14291f);border-color:#2f5c44;border-radius:50px 50px 70px 70px}
+body.handset-7110 .key{background:#2f5c44;border-color:#4a8a67;border-bottom-color:#122b1e;border-radius:20px}
+body.handset-7110 .nav{grid-template-columns:1fr;gap:6px;margin:3px 40px 15px}
+body.handset-7110 .nav .key{border-radius:50%;min-height:56px;font-size:20px}
+body.handset-7110 .ok{background:#3a7052;border-radius:50%;height:80px;width:80px;margin:0 auto}
+body.handset-7110 .softkeys{gap:40px}
 
-body.handset-3210 .phone{background:linear-gradient(180deg,#4a2f3f,#2f1d28);border-color:#6b455a}
-body.handset-3210 .key{background:#5c3d4f;border-color:#8a5a76;border-bottom-color:#241420}
-body.handset-3210 .ok{background:#6b455a}
+body.handset-3210 .phone{background:linear-gradient(180deg,#4a2f3f,#2f1d28);border-color:#6b455a;border-radius:40px 40px 55px 55px}
+body.handset-3210 .key{background:#5c3d4f;border-color:#8a5a76;border-bottom-color:#241420;border-radius:22px;min-height:48px}
+body.handset-3210 .ok{background:#6b455a;border-radius:28px}

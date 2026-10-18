@@ -297,7 +297,7 @@ select = function() {
 back = function() {
   if (!groups.length) return baseBack();
   if (view === 'player') { remember(); ended = null; }
-  if (view === 'home') { previous = 'home'; view = 'about'; render(); announce('About pocket cinema.'); return; }
+  if (view === 'home') { render(); announce('Pocket cinema home. Use up and down, then select.'); return; }
   if (view === 'serieslist' || view === 'options' || view === 'mylist') { view = 'home'; render(); announce('Home.'); return; }
   if (view === 'series') { view = 'serieslist'; render(); announce('Series.'); return; }
   if (view === 'episodes') {
