@@ -25,7 +25,7 @@ jobs:
           touch _site/.nojekyll
           if [ -d assets ]; then cp -R assets/. _site/assets/; fi
           python tools/build.py --output _site/assets
-          python tools/fiction.py --output _site/assets
+          python tools/catalogue.py --output _site/assets
       - uses: actions/configure-pages@v5
         with:
           enablement: true
