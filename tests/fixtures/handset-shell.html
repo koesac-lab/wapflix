@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+*{box-sizing:border-box}body{margin:0;min-height:100svh;display:grid;place-items:center;background:#171d22;color:#c0c5c1;font:12px monospace;padding:18px}button{font:inherit;cursor:pointer;touch-action:manipulation}.phone{width:min(100%,370px);padding:19px 23px 25px}.speaker{width:72px;height:7px}.brand{text-align:center}.lcd canvas{display:block;width:100%;height:auto;image-rendering:pixelated}.softkeys{display:grid;grid-template-columns:1fr 1fr}.nav{display:grid;grid-template-columns:1fr 1fr 1fr}.arrows{display:grid}.keypad{display:grid;grid-template-columns:repeat(3,1fr)}.legend{text-align:center}.notes{text-align:center}
+</style><link rel="stylesheet" href="../../themes.css"></head><body><main><section class="phone"><div class="speaker"></div><div class="brand">WAPFLIX</div><div class="bezel"><div class="lcd" id="lcd"><canvas id="display" width="240" height="224"></canvas></div></div><div class="softkeys"><button class="key" id="left" aria-label="OPEN">—</button><button class="key" id="back" aria-label="OPTIONS">—</button></div><div class="nav"><button class="key" data-key="4">◀</button><div class="arrows"><button class="key" data-key="2">▲</button><button class="key" data-key="8">▼</button></div><button class="key" data-key="5">OK</button></div><div class="keypad"></div><p class="legend"></p></section><p class="notes">Handset shell test fixture — not the cinema application.</p></main><script>
+window.events=[];
+function select(){events.push('select')}
+function back(){events.push('back')}
+function key(k){events.push(k);if(k==='#')document.getElementById('lcd').classList.toggle('dim')}
+document.getElementById('left').onclick=select;
+document.getElementById('back').onclick=()=>events.push('context-right');
+for(const value of '123456789*0#'){let b=document.createElement('button');b.className='key';b.dataset.key=value;b.textContent=value;b.onclick=()=>key(value);document.querySelector('.keypad').append(b)}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowDown')events.push('document-shortcut')});
+</script><script src="../../theme.js"></script></body></html>

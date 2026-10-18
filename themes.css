@@ -1,28 +1,94 @@
-/* Handset themes: geometry, not just colour */
-body.handset-3310 .phone{background:linear-gradient(180deg,#2b3a52,#1d2b40);border-color:#41546f;border-radius:44px 44px 60px 60px}
-body.handset-3310 .key{background:#41546f;border-color:#7286a3;border-bottom-color:#16233a;border-radius:14px 14px 20px 20px}
-body.handset-3310 .ok{background:#4f6484;border-radius:24px}
-body.handset-3310 .nav{gap:9px}
+/* WAPFLIX handset shells v4. Enlarged LCD, original-era control families. */
+body { background:radial-gradient(ellipse at 50% 22%,#303a3b 0,#141a1e 70%); padding:28px 12px; }
+body main { width:min(100%,430px); display:flex; flex-direction:column; align-items:center; }
+body .phone { --shell-top:#39485c; --shell-bottom:#182438; --rim:#687581; --face:#c2c5c2; --key-top:#e4e5df; --key-bottom:#a2aaa8; --key-ink:#25313b; --key-edge:#697577; --screen:#a6bd70; position:relative; isolation:isolate; flex:none; width:min(100%,354px); padding:25px 25px 28px; border:2px solid var(--rim); border-radius:65px 65px 72px 72px / 46px 46px 82px 82px; background:linear-gradient(100deg,#ffffff0d,transparent 25%,#00000020 90%),linear-gradient(var(--shell-top),var(--shell-bottom)); box-shadow:inset 0 0 0 3px #ffffff15,inset 0 -5px 8px #0007,0 2px 1px #0008,0 24px 50px #0008; }
+body .phone::before { content:''; position:absolute; z-index:-1; inset:10px 9px 12px; pointer-events:none; border:1px solid #ffffff1c; border-radius:inherit; }
+body .speaker { width:66px; height:12px; margin:0 auto 12px; border-radius:50%; border:2px solid #131b22; background:repeating-linear-gradient(90deg,#0a1218 0 3px,#53606a 3px 5px); box-shadow:0 1px 0 #ffffff30; }
+body .brand { color:#e0e1da; font:bold 14px/1.2 Arial,sans-serif; letter-spacing:3px; margin:0 0 12px; text-shadow:0 1px 1px #000; }
+.handset-model { display:block; font:8px/1.6 monospace; letter-spacing:2px; opacity:.65; }
+body .bezel { position:relative; margin:0 0 12px; padding:15px 12px 19px; border:1px solid #7b8581; border-radius:40% 40% 31% 31% / 15% 15% 12% 12%; background:linear-gradient(115deg,#eff0e9,var(--face) 40%,#8e9998); box-shadow:inset 0 2px 2px #fff8,0 3px 3px #0007; }
+body .lcd { background:var(--screen); border:3px solid #3e493c; border-radius:3px; padding:6px; box-shadow:inset 0 0 10px #3e4c3455,0 1px 0 #fff8; }
+body .lcd.dim { background:#7c8c62; box-shadow:inset 0 0 12px #33432566; }
+body .key { position:relative; appearance:none; padding:0; color:var(--key-ink); background:linear-gradient(160deg,var(--key-top),var(--key-bottom)); border:1px solid var(--key-edge); border-bottom:3px solid #18222b; box-shadow:inset 0 1px 1px #fff9,0 2px 2px #0005; text-shadow:0 1px 0 #fff7; min-width:0; min-height:0; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+body .key:active { transform:translateY(2px); border-bottom-width:1px; filter:brightness(.9); }
+body .key:focus-visible, .handset-slider-cover:focus-visible, .handset-picker select:focus-visible { outline:3px solid #d2ef96; outline-offset:3px; z-index:4; }
+.handset-controls { display:grid; position:relative; gap:7px 18px; margin:0 12px 15px; align-items:center; }
+.handset-controls .key { font:18px/1 Arial,sans-serif; }
+.controls-navi { grid-template-columns:1fr 1.3fr 1fr; grid-template-rows:36px 44px; }
+.controls-navi .handset-select { grid-column:2; grid-row:1; height:36px; border-radius:45% 45% 48% 48%; background:linear-gradient(#7f9cb8,#45627e); border-color:#263e58; color:#e7eef1; text-shadow:none; font-size:26px; }
+.controls-navi .handset-back { grid-column:1; grid-row:2; height:35px; width:48px; justify-self:end; border-radius:50% 38% 48% 50%; font-size:15px; }
+.handset-rocker { display:grid; width:48px; height:76px; grid-template-rows:1fr 1fr; gap:1px; justify-self:center; border-radius:45%; filter:drop-shadow(0 2px 1px #0005); }
+.controls-navi .handset-rocker { grid-column:3; grid-row:1 / 3; height:71px; }
+.handset-rocker .key { width:100%; height:100%; font-size:23px; box-shadow:inset 0 1px 0 #fff8; }
+.handset-rocker .handset-up { border-radius:50% 50% 10% 10%; }
+.handset-rocker .handset-down { border-radius:10% 10% 50% 50%; }
+.controls-dual,.controls-roller { grid-template-columns:1fr 56px 1fr; grid-template-rows:31px 43px; gap:7px 14px; }
+.controls-dual .handset-select,.controls-roller .handset-select { grid-column:1; grid-row:1; }
+.controls-dual .handset-back,.controls-roller .handset-back { grid-column:3; grid-row:1; }
+.controls-dual > .handset-select,.controls-dual > .handset-back,.controls-roller > .handset-select,.controls-roller > .handset-back { height:30px; border-radius:45%; }
+.controls-dual .handset-rocker { grid-column:2; grid-row:1 / 3; }
+.handset-call { grid-column:1; grid-row:2; height:35px; border-radius:50% 35% 45% 45%; color:#174d32!important; font-weight:bold!important; }
+.handset-end { grid-column:3; grid-row:2; height:35px; border-radius:35% 50% 45% 45%; color:#792e2e!important; font-weight:bold!important; transform:scaleX(-1); }
+body .handset-end:active { transform:scaleX(-1) translateY(2px); }
+.handset-keypad-stage { position:relative; }
+body .keypad { margin:0 13px; gap:8px 11px; }
+body .keypad .key { display:flex; align-items:center; justify-content:center; gap:5px; height:40px; min-height:40px; border-radius:45% 45% 44% 44% / 36% 36% 60% 60%; font:20px/1 Arial,sans-serif; }
+body .keypad small { display:block; font:7px/1 Arial,sans-serif; letter-spacing:.5px; margin:0; }
+body .keypad .key:nth-child(3n+1) { transform:rotate(-4deg); }
+body .keypad .key:nth-child(3n) { transform:rotate(4deg); }
+body .keypad .key:active { translate:0 2px; }
+body .legend { margin:17px -8px 0; font:8px/1.8 monospace; letter-spacing:0; color:#d8ded9; opacity:.75; }
+.handset-picker { margin-top:22px; display:flex; align-items:center; gap:12px; font:10px monospace; letter-spacing:2px; color:#b4bdb7; }
+.handset-picker select { max-width:190px; padding:9px 28px 9px 12px; border:1px solid #68746e; border-radius:5px; background:#20292a; color:#e2e8de; font:12px monospace; letter-spacing:0; }
+body .notes { margin:12px 0 0; }
+/* 3210: broad shoulders, warm silver fascia, rubbery straight keypad. */
+body.handset-3210 .phone { --shell-top:#353d4e; --shell-bottom:#1e2737; --face:#bfc2c0; --key-top:#d1d5cc; --key-bottom:#9da79d; width:min(100%,368px); padding:28px 28px 33px; border-radius:73px 73px 66px 66px / 51px 51px 67px 67px; }
+body.handset-3210 .bezel { padding:19px 13px 23px; border-radius:44% 44% 25% 25% / 16% 16% 10% 10%; }
+body.handset-3210 .speaker { width:56px; height:10px; }
+body.handset-3210 .keypad { gap:8px 9px; margin-inline:11px; }
+body.handset-3210 .keypad .key { border-radius:12px 12px 16px 16px; transform:none; height:42px; }
+body.handset-3210 .controls-navi .handset-select { background:linear-gradient(#cbd1c9,#86988d); color:#273c38; border-color:#5e716a; width:75px; justify-self:center; }
+/* 3310: navy Xpress-on shell, pale shield, blue Navi and fanned keys. */
+body.handset-3310 .bezel { border-radius:42% 42% 35% 35% / 15% 15% 16% 16%; }
+body.handset-3310 .keypad .key:nth-child(2),body.handset-3310 .keypad .key:nth-child(5),body.handset-3310 .keypad .key:nth-child(8),body.handset-3310 .keypad .key:nth-child(11) { border-radius:42% 42% 50% 50%; }
+/* 8210: compact red Xpress-on face, narrow waist, small separate keys. */
+body.handset-8210 .phone { --shell-top:#a7373c; --shell-bottom:#642029; --rim:#c77b7c; --face:#d0c9bf; --key-top:#e5ded0; --key-bottom:#b3afa5; width:min(100%,310px); padding:22px 22px 25px; border-radius:46px 46px 50px 50px / 43px 43px 67px 67px; }
+body.handset-8210 .bezel { padding:13px 9px 17px; border-radius:25px 25px 19px 19px; }
+body.handset-8210 .speaker { width:44px; height:8px; margin-bottom:9px; }
+body.handset-8210 .brand { font-size:12px; margin-bottom:9px; }
+body.handset-8210 .handset-controls { margin:0 8px 12px; gap:5px 12px; grid-template-columns:1fr 43px 1fr; }
+body.handset-8210 .handset-rocker { width:37px; height:68px; }
+body.handset-8210 .keypad { gap:7px 9px; margin:0 7px; }
+body.handset-8210 .keypad .key { height:35px; min-height:35px; border-radius:45%; font-size:18px; transform:none; }
+body.handset-8210 .keypad small { font-size:6px; }
+/* 6310: long graphite business shell, metallic face and elongated keys. */
+body.handset-6310 .phone { --shell-top:#4a4c45; --shell-bottom:#252923; --rim:#8d9180; --face:#aaa998; --key-top:#cdcebd; --key-bottom:#878d7c; width:min(100%,330px); padding:30px 22px 35px; border-radius:44px 44px 50px 50px / 48px 48px 70px 70px; }
+body.handset-6310 .speaker { width:50px; height:15px; border-radius:7px; }
+body.handset-6310 .bezel { padding:19px 10px 22px; border-radius:26px 26px 31px 31px; background:linear-gradient(100deg,#d4d3c7,#909384 65%,#b2b4a4); }
+body.handset-6310 .handset-controls { margin-inline:7px; margin-bottom:19px; }
+body.handset-6310 .keypad { gap:10px 12px; margin-inline:9px; }
+body.handset-6310 .keypad .key { height:43px; min-height:43px; border-radius:45% 45% 40% 40%; transform:none; }
+body.handset-6310 .handset-rocker { width:38px; }
+/* 7110: protruding antenna, olive metallic fascia, roller and moving chin. */
+body.handset-7110 .phone { --shell-top:#435346; --shell-bottom:#202d25; --rim:#7f8e77; --face:#91a18a; --key-top:#788676; --key-bottom:#3b4c3e; --key-ink:#ecedda; --key-edge:#25392a; width:min(100%,360px); padding:27px 25px 24px; margin-top:20px; border-radius:52px 52px 59px 59px / 46px 46px 54px 54px; }
+body.handset-7110 .phone::after { content:''; position:absolute; z-index:-1; right:17px; top:-24px; width:24px; height:38px; border:2px solid #171d17; border-radius:10px 10px 4px 4px; background:linear-gradient(90deg,#101810,#46533f,#182019); }
+body.handset-7110 .bezel { padding:16px 12px 18px; border-radius:23px; background:linear-gradient(110deg,#bac3a3,#71856c 75%,#9ba98e); }
+body.handset-7110 .speaker { width:70px; border-radius:4px; }
+body.handset-7110 .key { text-shadow:0 -1px 0 #0007; }
+body.handset-7110 .handset-controls { grid-template-columns:1fr 60px 1fr; margin-inline:12px; }
+.handset-roller { grid-column:2; grid-row:1 / 3; display:grid; grid-template-rows:22px 33px 22px; width:55px; justify-self:center; overflow:visible; }
+.handset-roller .key { height:100%; border-radius:7px; font-size:16px; }
+body .handset-roller .roller-press { border:2px solid #14241b; border-radius:9px; background:repeating-linear-gradient(0deg,#202d21 0 2px,#80917a 2px 4px,#4b6049 4px 6px); box-shadow:inset 5px 0 5px #0007,inset -5px 0 5px #0007,0 2px 2px #0008; }
+body.handset-7110 .keypad { margin:0 10px; gap:7px 9px; }
+body.handset-7110 .keypad .key { transform:none; height:36px; min-height:36px; font-size:18px; border-radius:8px 8px 13px 13px; }
+body.handset-7110 .handset-keypad-stage { padding-bottom:29px; }
+.handset-slider-cover { display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:5px; position:absolute; z-index:3; top:calc(100% - 24px); bottom:0; left:-5px; right:-5px; width:calc(100% + 10px); padding:5px 0 7px; border:1px solid #7b8b72; border-bottom:4px solid #142219; border-radius:7px 7px 36px 36px; background:linear-gradient(100deg,#65755c,#344c36 45%,#253a29); color:#bdcbb4; box-shadow:inset 0 1px 0 #ffffff40,0 4px 6px #0006; cursor:pointer; touch-action:manipulation; transition:top .2s ease; }
+.handset-slider-cover[hidden] { display:none; }
+.slider-grip { width:55px; height:5px; border-block:1px solid #1c3021; box-shadow:0 1px 0 #93a28666; }
+.slider-caption { font:7px/1 monospace; letter-spacing:1px; }
+.slider-closed .handset-slider-cover { top:0; padding-bottom:19px; }
+.slider-closed .keypad { visibility:hidden; pointer-events:none; }
+@media(max-width:380px) { body { padding:18px 9px; } body .phone { padding-left:20px; padding-right:20px; } body .legend { font-size:7px; } }
+@media(prefers-reduced-motion:reduce) { .handset-slider-cover { transition:none; } }
 
-body.handset-8210 .phone{background:linear-gradient(180deg,#3a3a3a,#232323);border-color:#555;border-radius:30px 30px 40px 40px}
-body.handset-8210 .key{background:#4a4a4a;border-color:#777;border-bottom-color:#1a1a1a;border-radius:6px;min-height:38px}
-body.handset-8210 .ok{background:#5a5a5a;border-radius:8px}
-body.handset-8210 .nav{gap:6px}
-body.handset-8210 .nav .key{font-size:13px}
-
-body.handset-6310 .phone{background:linear-gradient(180deg,#4a3f33,#2f2820);border-color:#6b5a45;border-radius:36px 36px 50px 50px}
-body.handset-6310 .key{background:#5c4f3d;border-color:#8a765a;border-bottom-color:#241d14;border-radius:18px}
-body.handset-6310 .nav{grid-template-columns:1fr 1fr 1fr;gap:7px}
-body.handset-6310 .nav .key{border-radius:50%;min-height:52px}
-body.handset-6310 .ok{background:#6b5a45;border-radius:50%;height:64px}
-
-body.handset-7110 .phone{background:linear-gradient(180deg,#1f3d2e,#14291f);border-color:#2f5c44;border-radius:50px 50px 70px 70px}
-body.handset-7110 .key{background:#2f5c44;border-color:#4a8a67;border-bottom-color:#122b1e;border-radius:20px}
-body.handset-7110 .nav{grid-template-columns:1fr;gap:6px;margin:3px 40px 15px}
-body.handset-7110 .nav .key{border-radius:50%;min-height:56px;font-size:20px}
-body.handset-7110 .ok{background:#3a7052;border-radius:50%;height:80px;width:80px;margin:0 auto}
-body.handset-7110 .softkeys{gap:40px}
-
-body.handset-3210 .phone{background:linear-gradient(180deg,#4a2f3f,#2f1d28);border-color:#6b455a;border-radius:40px 40px 55px 55px}
-body.handset-3210 .key{background:#5c3d4f;border-color:#8a5a76;border-bottom-color:#241420;border-radius:22px;min-height:48px}
-body.handset-3210 .ok{background:#6b455a;border-radius:28px}
+.handset-call svg,.handset-end svg { display:block; width:19px; height:19px; margin:auto; fill:currentColor; }
