@@ -1,0 +1,20 @@
+test_bad_geometry (test_diagnose.DiagnoseTests.test_bad_geometry) ... ok
+test_frame_mapping (test_diagnose.DiagnoseTests.test_frame_mapping) ... ok
+test_geometry (test_diagnose.DiagnoseTests.test_geometry) ... ok
+test_option_limits (test_diagnose.DiagnoseTests.test_option_limits) ... ok
+test_probe_rotation_and_aspect (test_diagnose.DiagnoseTests.test_probe_rotation_and_aspect) ... ok
+test_process_errors (test_diagnose.DiagnoseTests.test_process_errors) ... ok
+test_cli_and_overwrite_protection (test_diagnose.IntegrationTests.test_cli_and_overwrite_protection) ... ok
+test_past_eof (test_diagnose.IntegrationTests.test_past_eof) ... ok
+test_real_conversion (test_diagnose.IntegrationTests.test_real_conversion) ... ok
+test_bom_crlf_markup (test_srt.SrtTests.test_bom_crlf_markup) ... ok
+test_empty_and_malformed (test_srt.SrtTests.test_empty_and_malformed) ... ok
+test_encodings (test_srt.SrtTests.test_encodings) ... ok
+test_invalid_times_reported (test_srt.SrtTests.test_invalid_times_reported) ... ok
+test_multiline_absolute_time (test_srt.SrtTests.test_multiline_absolute_time) ... ok
+test_sort_overlap_and_separator (test_srt.SrtTests.test_sort_overlap_and_separator) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.794s
+
+OK
