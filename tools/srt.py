@@ -83,7 +83,6 @@ def parse_srt(path: Path, *, max_bytes: int = 8 * 1024 * 1024) -> SubtitleParseR
 
 
 def cues_for_window(result: SubtitleParseResult, start: float, end: float) -> tuple[SubtitleCue, ...]:
-    """Return cues overlapping [start, end), rebased to the preview window."""
     if end <= start:
         raise SubtitleError("preview end must be after preview start")
     selected = []
