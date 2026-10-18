@@ -1,0 +1,26 @@
+[
+  {
+    "id": "test-video",
+    "title": "Video test",
+    "description": "Real video converted into ASCII. Silent playback test.",
+    "label": "ORIGINAL / TRANSMISSION",
+    "poster": "      s;;rssXXsXXXXXXXXXA22A5h522233hh2AMM      \n      r;:isXXAXsssrri;irA52AA533hhhMhh2AMG      \n      r::isXAAAssriri:,,,A22A53hhMMhHMA2HH      \n      r,:;rrssXssrX2As::,s2A53MMMHMHMMA5HG      \n      i,:;rrssssssrir:::isXXA53MMMHMHMA3HH      \n      i,:;rrssssssA2sirrsXXXXXA5hMMh35AhHG      \n      r,:;rrrsssssXAAssrrsXAXXXXX2255AX5hH      \n      r::;rrrssXssX22AsriiirsXXXXXA535A25M      \n      i::;rrrsX525MM322rrrrssrsX255hM2X32h      \n      i,:;rrrrrA2hMMhh32AssXsXsss3hhH52Mh3      \n      i,:;rrrsssAhMMMhhhM5XAsArAsr5MMA2HHH      \n      i,:;rrrsrsXhMMMhhhh333XAss5rs3MA2HHH      \n      i,:;rrrsssXMM333hhhh5AsXAr3Xss5X5HMG      \n      i,:;rrrrssshhh33hh352XXr2X55sssX2HHH      ",
+    "variants": {
+      "low": {
+        "path": "assets/test-video-low.json.gz",
+        "fallback": "assets/test-video-low.json",
+        "bytes": 12355
+      },
+      "medium": {
+        "path": "assets/test-video-medium.json.gz",
+        "fallback": "assets/test-video-medium.json",
+        "bytes": 33838
+      },
+      "high": {
+        "path": "assets/test-video-high.json.gz",
+        "fallback": "assets/test-video-high.json",
+        "bytes": 72793
+      }
+    }
+  }
+]
