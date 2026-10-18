@@ -1,9 +1,9 @@
 import json
 import subprocess
 import sys
+import tempfile
+import unittest
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -25,45 +25,55 @@ Outside window
 """
 
 
-def test_converts_and_rebases_cues(tmp_path):
-    source = tmp_path / "sample.srt"
-    source.write_text(SRT, encoding="utf-8")
-    result = clip.clip_subtitles(source, 30.0, 15.0)
-    assert result == [
-        {"start": 0.5, "end": 1.8, "text": "Hello caption"},
-        {"start": 2.0, "end": 3.0, "text": "Second caption"},
-    ]
+class MakeClipSubtitlesTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name)
+
+    def write_srt(self):
+        source = self.path / "sample.srt"
+        source.write_text(SRT, encoding="utf-8")
+        return source
+
+    def test_converts_and_rebases_cues(self):
+        source = self.write_srt()
+        result = clip.clip_subtitles(source, 30.0, 15.0)
+        self.assertEqual(result, [
+            {"start": 0.5, "end": 1.8, "text": "Hello caption"},
+            {"start": 2.0, "end": 3.0, "text": "Second caption"},
+        ])
+
+    def test_excludes_cues_outside_clip(self):
+        source = self.write_srt()
+        result = clip.clip_subtitles(source, 55.0, 5.0)
+        self.assertEqual(result, [])
+
+    def test_cli_writes_json(self):
+        source = self.write_srt()
+        output = self.path / "subtitles.json"
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "make_clip_subtitles.py"),
+             str(source), "--start", "30", "--seconds", "15",
+             "--output", str(output)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["text"], "Hello caption")
+
+    def test_cli_rejects_invalid_duration(self):
+        source = self.write_srt()
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "make_clip_subtitles.py"),
+             str(source), "--start", "30", "--seconds", "0",
+             "--output", str(self.path / "out.json")],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Error:", result.stderr)
 
 
-def test_excludes_cues_outside_clip(tmp_path):
-    source = tmp_path / "sample.srt"
-    source.write_text(SRT, encoding="utf-8")
-    result = clip.clip_subtitles(source, 55.0, 5.0)
-    assert result == []
-
-
-def test_cli_writes_json(tmp_path):
-    source = tmp_path / "sample.srt"
-    source.write_text(SRT, encoding="utf-8")
-    output = tmp_path / "subtitles.json"
-    result = subprocess.run(
-        [sys.executable, str(ROOT / "tools" / "make_clip_subtitles.py"),
-         str(source), "--start", "30", "--seconds", "15", "--output", str(output)],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 0, result.stderr
-    data = json.loads(output.read_text(encoding="utf-8"))
-    assert len(data) == 2
-    assert data[0]["text"] == "Hello caption"
-
-
-def test_cli_rejects_invalid_duration(tmp_path):
-    source = tmp_path / "sample.srt"
-    source.write_text(SRT, encoding="utf-8")
-    result = subprocess.run(
-        [sys.executable, str(ROOT / "tools" / "make_clip_subtitles.py"),
-         str(source), "--start", "30", "--seconds", "0", "--output", str(tmp_path / "out.json")],
-        capture_output=True, text=True,
-    )
-    assert result.returncode == 2
-    assert "Error:" in result.stderr
+if __name__ == "__main__":
+    unittest.main()
