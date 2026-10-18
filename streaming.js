@@ -18,6 +18,13 @@ const entries=()=>groups.flatMap(g=>g.items);
 const byId=id=>entries().find(e=>e.id===id);
 const total=()=>clip?clip.frames.length/clip.fps:0;
 const short=e=>e.episode_title||e.title;
+const handsetId=()=>window.wapflixHandset?.id||'';
+const singleNavi=()=>['3210','3310'].includes(handsetId());
+const baseFooter=footer;
+footer=function(left,right){
+  if(singleNavi()){left='SELECT';right='BACK';}
+  baseFooter(left,right);
+};
 function persist(){try{localStorage.setItem(STORE,JSON.stringify(saved));}catch{}}
 function remember(){
   if(!item||!clip||message) return;
@@ -115,8 +122,9 @@ function renderPage(){
   }
   if(!rows.length){center('NOTHING HERE YET',88);center('BACK TO CONTINUE',103);footer('BACK','BACK');return;}
   const start=Math.floor(page.selected/capacity)*capacity;
-  rows.slice(start,start+capacity).forEach((r,n)=>drawLine(r.label,y+n*20,start+n===page.selected,r.suffix||''));
-  text((page.selected+1)+'/'+rows.length,4,193);
+  rows.slice(start,start+capacity).forEach((r,n)=>drawLine(r.label,y+n*18,start+n===page.selected,r.suffix||''));
+  const filled=Math.max(1,Math.round((page.selected+1)/rows.length*8));
+  text('#'.repeat(filled)+'-'.repeat(8-filled),4,193);
   if(rows.length>capacity)text('2 UP / 8 DOWN',151,193);
   let left='OPEN';
   if(page.name==='details'||page.name==='series')left=rows[page.selected].label.startsWith('REMOVE')?'REMOVE':rows[page.selected].label.startsWith('ADD')?'ADD':rows[page.selected].label;
