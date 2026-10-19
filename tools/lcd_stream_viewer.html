@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wapflix / LCD streaming checkpoint</title>
+<style>
+*{box-sizing:border-box}body{max-width:740px;margin:auto;padding:24px;background:#171d22;color:#c8d2bd;font:15px system-ui}h1{font-size:21px}canvas{display:block;width:100%;height:auto;background:#a6bd70;border:10px solid #303d49;image-rendering:pixelated}button{font:inherit;padding:12px 20px;margin:12px 8px 12px 0}pre{white-space:pre-wrap;line-height:1.6}#state{min-height:1.5em}p{line-height:1.5}
+</style></head><body><h1>Wapflix / live LCD conversion</h1>
+<p>Milestone 2. Two-second chunks; four-second startup buffer. Silent. No captions or seeking. Start replaces the current session.</p>
+<button id="start">Start</button><button id="pause" disabled>Pause</button><button id="stop" disabled>Stop</button>
+<canvas id="screen" width="240" height="135" aria-label="Dithered monochrome video"></canvas>
+<p id="state" role="status" aria-live="polite">Ready</p><pre id="stats"></pre>
+<script nonce="__TOKEN__">
+'use strict';
+const token='__TOKEN__',$=id=>document.getElementById(id),canvas=$('screen'),ctx=canvas.getContext('2d');
+let session=null,manifest=null,generation=0,controller=null,busy=false,frames=new Map();
+let clock=0,last=null,warmed=false,intent=false,painted=-1;
+function phase(value){$('state').textContent=value;}
+async function api(path,body,signal){
+ const options={headers:{'X-Wapflix-Test':token},signal};
+ if(body!==undefined){options.method='POST';options.headers['Content-Type']='application/json';options.body=JSON.stringify(body);}
+ const response=await fetch(path,options);
+ if(!response.ok){let message=`HTTP ${response.status}`;try{message=(await response.json()).error||message;}catch{}throw Error(message);}
+ return response.status===204?null:await response.json();
+}
+function endBeacon(){if(session)navigator.sendBeacon('/api/stop',JSON.stringify({id:session,token}));}
+window.addEventListener('pagehide',endBeacon);
+document.addEventListener('visibilitychange',()=>{
+ if(document.hidden&&session){intent=false;last=null;$('pause').textContent='Resume';phase('Paused');}
+});
+async function stop(){
+ const old=session;session=null;++generation;if(controller)controller.abort();busy=false;
+ intent=false;last=null;manifest=null;frames.clear();$('pause').disabled=true;$('stop').disabled=true;phase('Stopped');
+ if(old)try{await api('/api/stop',{id:old});}catch(error){phase('Stop failed: '+error.message);}
+}
+$('stop').onclick=stop;
+$('pause').onclick=()=>{if(!session)return;intent=!intent;last=null;$('pause').textContent=intent?'Pause':'Resume';phase(intent?'Buffering':'Paused');};
+$('start').onclick=async()=>{
+ $('start').disabled=true;
+ try{
+  await stop();const g=generation;controller=new AbortController();phase('Starting');
+  const data=await api('/api/start',{},controller.signal);if(g!==generation)return;
+  session=data.id;manifest=data;clock=0;last=null;warmed=false;intent=true;painted=-1;frames.clear();
+  canvas.width=data.cols;canvas.height=data.rows;ctx.fillStyle='#a6bd70';ctx.fillRect(0,0,canvas.width,canvas.height);
+  $('pause').disabled=false;$('stop').disabled=false;$('pause').textContent='Pause';phase('Buffering');poll();
+ }catch(error){if(error.name!=='AbortError')phase('Error: '+error.message);}finally{$('start').disabled=false;}
+};
+async function poll(){
+ if(!session||busy)return;
+ busy=true;const g=generation,sid=session,signal=controller.signal;
+ try{
+  const data=await api('/api/pulse',{id:sid,frame:Math.floor(clock*manifest.fps),paused:!intent},signal);
+  if(g!==generation)return;manifest=data;
+  if(['error','stopped'].includes(data.state))throw Error(data.error||'Session stopped or expired');
+  const base=Math.floor(clock*data.fps/data.chunk_frames);
+  for(const n of [...frames.keys()])if(n<base-1)frames.delete(n);
+  for(let n=base;n<base+4&&n<data.generated_chunks;n++){
+   if(frames.has(n))continue;
+   const chunk=await api(`/api/chunk?id=${encodeURIComponent(sid)}&n=${n}`,undefined,signal);
+   if(g!==generation)return;
+   if(chunk)frames.set(n,chunk);
+  }
+  if(!warmed&&frames.has(0)&&(frames.has(1)||data.state==='complete'))warmed=true;
+ }catch(error){if(g===generation&&error.name!=='AbortError'){intent=false;phase('Error: '+error.message);endBeacon();}}
+ finally{if(g===generation)busy=false;}
+}
+setInterval(poll,250);
+function bufferedEnd(){
+ if(!manifest)return clock;
+ let end=clock;
+ for(let i=Math.floor(clock*manifest.fps/manifest.chunk_frames);frames.has(i);i++){
+  const chunk=frames.get(i);end=(chunk.start_frame+chunk.frames.length)/manifest.fps;
+ }
+ return end;
+}
+function draw(){
+ if(!manifest)return;
+ let number=Math.floor(clock*manifest.fps);
+ if(manifest.total_frames!==null)number=Math.min(number,manifest.total_frames-1);
+ const chunk=frames.get(Math.floor(number/manifest.chunk_frames));
+ if(chunk&&number!==painted){
+  const hex=chunk.frames[number-chunk.start_frame];
+  if(typeof hex==='string'){
+   if(hex.length!==Math.ceil(canvas.width*canvas.height/8)*2||!/^[0-9a-f]+$/i.test(hex))throw Error('Invalid LCD frame');
+   painted=number;ctx.fillStyle='#a6bd70';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#25371e';
+   for(let b=0;b<hex.length;b+=2){const value=parseInt(hex.slice(b,b+2),16);
+    for(let bit=0;bit<8;bit++){const pixel=b/2*8+bit;if(pixel<canvas.width*canvas.height&&(value&(128>>bit)))ctx.fillRect(pixel%canvas.width,Math.floor(pixel/canvas.width),1,1);}}
+  }
+ }
+ $('stats').textContent=`Source position: ${(manifest.source_start+clock).toFixed(1)}s
+Buffered ahead: ${Math.max(0,bufferedEnd()-clock).toFixed(1)}s
+Server chunks retained: ${manifest.retained_chunks} / browser chunks: ${frames.size}
+Worker: ${manifest.state} / running: ${manifest.worker_running}
+First conversion chunk: ${manifest.first_chunk_seconds===null?'pending':manifest.first_chunk_seconds.toFixed(3)+'s'}
+Profile: ${manifest.cols}x${manifest.rows} / ${manifest.fps} fps`;
+}
+function tick(now){
+ if(session&&manifest){
+  const dt=last===null?0:Math.max(0,Math.min(.25,(now-last)/1000));last=now;
+  if(intent&&warmed){
+   const end=bufferedEnd();clock=Math.min(clock+dt,end);
+   if(manifest.state==='complete'&&manifest.total_frames!==null&&clock>=manifest.total_frames/manifest.fps){
+    intent=false;$('pause').disabled=true;phase('Finished');
+   }else phase(clock>=end?'Buffering':'Playing');
+  }
+  try{draw();}catch(error){intent=false;phase('Error: '+error.message);endBeacon();}
+ }
+ requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script></body></html>
