@@ -3,6 +3,8 @@
 // UI text remains uppercase. ASCII artwork keeps its original character case.
 const artGlyphs = {...glyphs,i:'04000C0404040E',r:'00001619101010',s:'00000F100E011E',h:'10101619111111',o:'00000E1111110E'};
 const menuRender = render, oldKey = key, oldSelect = select, oldBack = back;
+// Fine LCD is the default quality; 0 still cycles the three renditions.
+quality=1;
 let captions = true, lcdMode = true;
 try { lcdMode=localStorage.getItem('wapflix-renderer')!=='ascii'; } catch {}
 const baseLoad=load;
@@ -35,7 +37,7 @@ function info() {
   text(`${seconds(elapsed)} / ${seconds(clip.frames.length/clip.fps)}   ${labels[quality]}`,5,150);
   text(`${clip.cols}X${clip.rows} / ${clip.fps} FPS / ${(bytes/1024).toFixed(1)}K`,5,163);
   text('2 CAPTIONS '+(captions?'ON':'OFF')+' / 3 SHARE',5,178);
-  text('7 MODE: '+(clip.layout==='lcd-1bit'?'LCD DOTS':'ASCII'),5,192);
+  text(item.lcd_only?'LCD DOTS / ASCII NOT GENERATED':'7 MODE: '+(clip.layout==='lcd-1bit'?'LCD DOTS':'ASCII'),5,192);
   footer('PLAY','BACK');
 }
 render = function() {
@@ -100,6 +102,7 @@ paint = function() {
 };
 key = function(value) {
   if(view==='player'&&clip&&value==='7') {
+    if(item.lcd_only) {announce('ASCII not generated. Regenerate with --ascii to compare.');return;}
     if(!item.lcd_variants) {announce('No LCD variant. Convert this clip first.');return;}
     lcdMode=!lcdMode;
     try {localStorage.setItem('wapflix-renderer',lcdMode?'lcd':'ascii');} catch {}
