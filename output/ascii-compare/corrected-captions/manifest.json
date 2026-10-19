@@ -1,0 +1,554 @@
+{
+  "version": 1,
+  "video": "/home/koesac/.local/share/wapflix/test-media/dQw4w9WgXcQ/source.mp4",
+  "srt": "/home/koesac/.local/share/wapflix/test-media/dQw4w9WgXcQ/source.youtube.en.srt",
+  "preset": "corrected-polarity",
+  "start": 30.0,
+  "seconds": 15.0,
+  "fps": 6,
+  "columns": 40,
+  "rows": 11,
+  "frames": [
+    {
+      "file": "frame-0000.png",
+      "source_time": 30.0,
+      "preview_time": 0.0,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0001.png",
+      "source_time": 30.166666666666668,
+      "preview_time": 0.16666666666666666,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0002.png",
+      "source_time": 30.333333333333332,
+      "preview_time": 0.3333333333333333,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0003.png",
+      "source_time": 30.5,
+      "preview_time": 0.5,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0004.png",
+      "source_time": 30.666666666666668,
+      "preview_time": 0.6666666666666666,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0005.png",
+      "source_time": 30.833333333333332,
+      "preview_time": 0.8333333333333334,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0006.png",
+      "source_time": 31.0,
+      "preview_time": 1.0,
+      "cue": "\u266a A full commitment's\nwhat I'm thinking of \u266a"
+    },
+    {
+      "file": "frame-0007.png",
+      "source_time": 31.166666666666668,
+      "preview_time": 1.1666666666666667,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0008.png",
+      "source_time": 31.333333333333332,
+      "preview_time": 1.3333333333333333,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0009.png",
+      "source_time": 31.5,
+      "preview_time": 1.5,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0010.png",
+      "source_time": 31.666666666666668,
+      "preview_time": 1.6666666666666667,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0011.png",
+      "source_time": 31.833333333333332,
+      "preview_time": 1.8333333333333333,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0012.png",
+      "source_time": 32.0,
+      "preview_time": 2.0,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0013.png",
+      "source_time": 32.166666666666664,
+      "preview_time": 2.1666666666666665,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0014.png",
+      "source_time": 32.333333333333336,
+      "preview_time": 2.3333333333333335,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0015.png",
+      "source_time": 32.5,
+      "preview_time": 2.5,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0016.png",
+      "source_time": 32.666666666666664,
+      "preview_time": 2.6666666666666665,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0017.png",
+      "source_time": 32.833333333333336,
+      "preview_time": 2.8333333333333335,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0018.png",
+      "source_time": 33.0,
+      "preview_time": 3.0,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0019.png",
+      "source_time": 33.166666666666664,
+      "preview_time": 3.1666666666666665,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0020.png",
+      "source_time": 33.333333333333336,
+      "preview_time": 3.3333333333333335,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0021.png",
+      "source_time": 33.5,
+      "preview_time": 3.5,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0022.png",
+      "source_time": 33.666666666666664,
+      "preview_time": 3.6666666666666665,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0023.png",
+      "source_time": 33.833333333333336,
+      "preview_time": 3.8333333333333335,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0024.png",
+      "source_time": 34.0,
+      "preview_time": 4.0,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0025.png",
+      "source_time": 34.166666666666664,
+      "preview_time": 4.166666666666667,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0026.png",
+      "source_time": 34.333333333333336,
+      "preview_time": 4.333333333333333,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0027.png",
+      "source_time": 34.5,
+      "preview_time": 4.5,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0028.png",
+      "source_time": 34.666666666666664,
+      "preview_time": 4.666666666666667,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0029.png",
+      "source_time": 34.833333333333336,
+      "preview_time": 4.833333333333333,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0030.png",
+      "source_time": 35.0,
+      "preview_time": 5.0,
+      "cue": "\u266a You wouldn't get this\nfrom any other guy \u266a"
+    },
+    {
+      "file": "frame-0031.png",
+      "source_time": 35.166666666666664,
+      "preview_time": 5.166666666666667,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0032.png",
+      "source_time": 35.333333333333336,
+      "preview_time": 5.333333333333333,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0033.png",
+      "source_time": 35.5,
+      "preview_time": 5.5,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0034.png",
+      "source_time": 35.666666666666664,
+      "preview_time": 5.666666666666667,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0035.png",
+      "source_time": 35.833333333333336,
+      "preview_time": 5.833333333333333,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0036.png",
+      "source_time": 36.0,
+      "preview_time": 6.0,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0037.png",
+      "source_time": 36.166666666666664,
+      "preview_time": 6.166666666666667,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0038.png",
+      "source_time": 36.333333333333336,
+      "preview_time": 6.333333333333333,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0039.png",
+      "source_time": 36.5,
+      "preview_time": 6.5,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0040.png",
+      "source_time": 36.666666666666664,
+      "preview_time": 6.666666666666667,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0041.png",
+      "source_time": 36.833333333333336,
+      "preview_time": 6.833333333333333,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0042.png",
+      "source_time": 37.0,
+      "preview_time": 7.0,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0043.png",
+      "source_time": 37.166666666666664,
+      "preview_time": 7.166666666666667,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0044.png",
+      "source_time": 37.333333333333336,
+      "preview_time": 7.333333333333333,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0045.png",
+      "source_time": 37.5,
+      "preview_time": 7.5,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0046.png",
+      "source_time": 37.666666666666664,
+      "preview_time": 7.666666666666667,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0047.png",
+      "source_time": 37.833333333333336,
+      "preview_time": 7.833333333333333,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0048.png",
+      "source_time": 38.0,
+      "preview_time": 8.0,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0049.png",
+      "source_time": 38.166666666666664,
+      "preview_time": 8.166666666666666,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0050.png",
+      "source_time": 38.333333333333336,
+      "preview_time": 8.333333333333334,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0051.png",
+      "source_time": 38.5,
+      "preview_time": 8.5,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0052.png",
+      "source_time": 38.666666666666664,
+      "preview_time": 8.666666666666666,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0053.png",
+      "source_time": 38.833333333333336,
+      "preview_time": 8.833333333333334,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0054.png",
+      "source_time": 39.0,
+      "preview_time": 9.0,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0055.png",
+      "source_time": 39.166666666666664,
+      "preview_time": 9.166666666666666,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0056.png",
+      "source_time": 39.333333333333336,
+      "preview_time": 9.333333333333334,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0057.png",
+      "source_time": 39.5,
+      "preview_time": 9.5,
+      "cue": "\u266a I just wanna tell you\nhow I'm feeling \u266a"
+    },
+    {
+      "file": "frame-0058.png",
+      "source_time": 39.666666666666664,
+      "preview_time": 9.666666666666666,
+      "cue": null
+    },
+    {
+      "file": "frame-0059.png",
+      "source_time": 39.833333333333336,
+      "preview_time": 9.833333333333334,
+      "cue": null
+    },
+    {
+      "file": "frame-0060.png",
+      "source_time": 40.0,
+      "preview_time": 10.0,
+      "cue": null
+    },
+    {
+      "file": "frame-0061.png",
+      "source_time": 40.166666666666664,
+      "preview_time": 10.166666666666666,
+      "cue": null
+    },
+    {
+      "file": "frame-0062.png",
+      "source_time": 40.333333333333336,
+      "preview_time": 10.333333333333334,
+      "cue": null
+    },
+    {
+      "file": "frame-0063.png",
+      "source_time": 40.5,
+      "preview_time": 10.5,
+      "cue": null
+    },
+    {
+      "file": "frame-0064.png",
+      "source_time": 40.666666666666664,
+      "preview_time": 10.666666666666666,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0065.png",
+      "source_time": 40.833333333333336,
+      "preview_time": 10.833333333333334,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0066.png",
+      "source_time": 41.0,
+      "preview_time": 11.0,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0067.png",
+      "source_time": 41.166666666666664,
+      "preview_time": 11.166666666666666,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0068.png",
+      "source_time": 41.333333333333336,
+      "preview_time": 11.333333333333334,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0069.png",
+      "source_time": 41.5,
+      "preview_time": 11.5,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0070.png",
+      "source_time": 41.666666666666664,
+      "preview_time": 11.666666666666666,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0071.png",
+      "source_time": 41.833333333333336,
+      "preview_time": 11.833333333333334,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0072.png",
+      "source_time": 42.0,
+      "preview_time": 12.0,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0073.png",
+      "source_time": 42.166666666666664,
+      "preview_time": 12.166666666666666,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0074.png",
+      "source_time": 42.333333333333336,
+      "preview_time": 12.333333333333334,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0075.png",
+      "source_time": 42.5,
+      "preview_time": 12.5,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0076.png",
+      "source_time": 42.666666666666664,
+      "preview_time": 12.666666666666666,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0077.png",
+      "source_time": 42.833333333333336,
+      "preview_time": 12.833333333333334,
+      "cue": "\u266a Gotta make you understand \u266a"
+    },
+    {
+      "file": "frame-0078.png",
+      "source_time": 43.0,
+      "preview_time": 13.0,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0079.png",
+      "source_time": 43.166666666666664,
+      "preview_time": 13.166666666666666,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0080.png",
+      "source_time": 43.333333333333336,
+      "preview_time": 13.333333333333334,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0081.png",
+      "source_time": 43.5,
+      "preview_time": 13.5,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0082.png",
+      "source_time": 43.666666666666664,
+      "preview_time": 13.666666666666666,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0083.png",
+      "source_time": 43.833333333333336,
+      "preview_time": 13.833333333333334,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0084.png",
+      "source_time": 44.0,
+      "preview_time": 14.0,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0085.png",
+      "source_time": 44.166666666666664,
+      "preview_time": 14.166666666666666,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0086.png",
+      "source_time": 44.333333333333336,
+      "preview_time": 14.333333333333334,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0087.png",
+      "source_time": 44.5,
+      "preview_time": 14.5,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0088.png",
+      "source_time": 44.666666666666664,
+      "preview_time": 14.666666666666666,
+      "cue": "\u266a Never gonna give you up \u266a"
+    },
+    {
+      "file": "frame-0089.png",
+      "source_time": 44.833333333333336,
+      "preview_time": 14.833333333333334,
+      "cue": "\u266a Never gonna give you up \u266a"
+    }
+  ],
+  "subtitle_errors": []
+}
