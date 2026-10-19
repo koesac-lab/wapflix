@@ -20,6 +20,8 @@ jobs:
           python-version: '3.12'
       - name: Test phone scenes
         run: python -m unittest discover -s tests
+      - name: Test LCD player
+        run: node tests/test_lcd_player.cjs
       - name: Build static cinema
         run: |
           mkdir -p _site/assets
@@ -30,6 +32,7 @@ jobs:
           python tools/catalogue.py --output _site/assets
           python tools/presentation.py --output _site
           python tools/phone_video.py --output _site
+          python tools/lcd_video.py --output _site
       - uses: actions/configure-pages@v5
         with:
           enablement: true
