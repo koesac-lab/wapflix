@@ -1,221 +1,195 @@
-# Remaining Stage 5: handset lifecycle, captions and seeking
+# Remaining Stage 5: reviewed lifecycle, captions and seeking roadmap
 
-Status: planning only. This document adds no runtime implementation, tests, deployment or validation claim. It complements HANDSET_5A3_PLAN.md without replacing or modifying that approved plan.
+Status: reviewed plan, 2026-10-20. Documentation only; no runtime fixes, implementation or new host/browser test result is claimed. This revision complements HANDSET_5A3_PLAN.md and incorporates the subsequent code/contract review.
 
-## 1. Roadmap and prerequisites
+## 1. Roadmap
 
-| Step | Only deliver this | Pass condition |
+| Step | Scope | Pass condition |
 | --- | --- | --- |
-| 5A.1 | Existing handset served over the LAN with static assets | Local phone UI and static playback work |
-| 5A.2 | Independently tested browser source adapter | Adapter tests pass; no interface change |
-| 5A.3 | One fixed on-demand entry inside the handset; Start/render/Stop | Converted frames appear inside the phone |
-| 5A.4 | Pause/resume, navigation lifecycle and replacement handling | Position holds; leaving releases the worker; starting again works |
-| 5A.5 | Source-time captions in the handset | Captions follow displayed frames through pause and buffering |
-| 5A.6 | Handset controls connected to the M4A seek API | Rapid seeks and Stop cannot restore stale frames or captions |
+| 5A.1 | Local handset with static assets | LAN phone UI/static playback work |
+| 5A.2 | Independent browser source adapter | Adapter tests pass; no UI change |
+| 5A.2R1 | Persistent per-stream readiness correction | Pause remains honoured after old chunks are evicted |
+| 5A.2R2 | Unacknowledged-Start ordering/cancellation contract | Delayed old work cannot replace or resurrect newer/cancelled intent |
+| 5A.3 | One fixed live entry; Start/render/Stop | Progressive frames inside the handset, static playback preserved |
+| 5A.4 | Pause/Resume and lifecycle | Position holds; navigation/replacement/expiry are safe |
+| 5A.5 | Source-time handset captions | Captions follow presented frames through pause/buffering |
+| 5A.6 | Handset restart-seeking | Latest seek wins; Stop prevents stale restoration |
 
-The existence of earlier files or documentation is not proof that every checkpoint has passed on the host. Record actual local versions and results before continuing. 5A.3 remains a planned prerequisite until its acceptance gate passes. Do not start 5A.4 as a substitute for finishing the live start/render/stop connection.
+Files/docs existing is not proof of host acceptance. Verify actual local versions, including local-only work, before each pass. Finish the reviewed prerequisites and 5A.3 before using later features to compensate for a missing basic connection. Related documents: HANDSET_5A1.md, HANDSET_5A2.md, LOCAL_STREAMING_M3.md, LOCAL_STREAMING_M4A.md and LOCAL_STREAMING_M4B.md.
 
-Related documents: HANDSET_5A1.md, HANDSET_5A2.md, HANDSET_5A3_PLAN.md, LOCAL_STREAMING_M3.md, LOCAL_STREAMING_M4A.md and LOCAL_STREAMING_M4B.md.
+## 2. Review prerequisites: separate fixes, not implied completed work
 
-## 2. Shared boundaries
+### 5A.2R1: readiness must survive eviction
 
-- Keep one server-configured source, the current LCD profile and the existing extract limits. This stage does not remove the current maximum request length or add whole-library browsing.
-- Preserve the single worker/session model, same-origin hosting, LAN access and existing capability/Host/Origin checks. No CORS bypass or public exposure.
-- Preserve static playback and the public Pages build. Local-only scripts and the virtual live entry must not enter the public catalogue.
-- Use one bridge playback clock, one animation chain and one active polling timer. The source adapter owns transport, not rendering or time advancement.
-- Keep rolling memory bounded. No whole-video frame list, persistent disk cache or cache-reuse seeking.
-- Do not add Plex, Docker, audio, quality switching, live ASCII mode, persistent live resume or autoplay-next.
-- Reuse and extend saved modules instead of reconstructing M1-M4. Fix a discovered prerequisite defect separately with a focused regression test.
-- Save each small implementation pass before advancing. Stage only intended source/test/docs files, not new source videos, full SRT files, capability tokens, backups, debug output or archives. Existing repository cleanup is a separate task.
+The reviewed stream-source.js determines startup warmth from cached chunks 0 and 1. A focused harness using its poll method reproduced: initial cache 0/1/2/3; advance from source 30 to 34; cache becomes 1/2/3/4/5; a subsequent paused=true request sends paused=false. This is a confirmed logic defect in the reviewed algorithm, not a claim that it was observed on the user's host.
 
-## 3. 5A.4: playback lifecycle
+Plan a small adapter fix: readiness persists for the current stream generation after initial prefill. Reset it on Start/replacement/seek, not normal cache eviction. Do not retain old initial chunks forever merely to satisfy the predicate.
 
-### Goal and overlap with 5A.3
+Regression gate: advance far enough to evict chunk 0, pause and assert the outgoing API flag remains true and generation parks within existing in-flight/look-ahead bounds. Also preserve paused-before-first-frame prefill, partial completed clips and reset-on-new-stream behaviour.
 
-5A.3 already requires minimum Stop/Back cleanup. 5A.4 must verify and extend it, not introduce a second lifecycle controller. Its new feature is user-facing Pause/Resume plus robust interaction among buffering, navigation, replacement and visibility changes.
+### 5A.2R2: fence unacknowledged Starts
 
-In the live view, Select/key 5 changes from Stop to Pause/Resume. Back still stops and returns; * still stops then goes Home. Static controls remain unchanged.
+A controlled timeout/late-handler simulation using the adapter lifecycle showed the client owning a newer navigation while a delayed old Start replaced it server-side. The reviewed Start API creates a new navigation without pre-acknowledgement client request ordering/cancellation. Client serialization and fetch abort alone do not establish the desired server-side guarantee. This is a reproduced protocol risk, not a reported production/mini-PC incident.
 
-### State and intent contract
+Before handset integration, specify a narrow client/server identity and ordering contract for Start work before its navigation ID is acknowledged. If required, add server generation fencing and cancellation/tombstone handling as a separate compatibility-tested API patch. Do not prescribe unreviewed endpoint names in this roadmap, weaken Host/Origin checks or rebuild the backend.
 
-Separate user intent from transport readiness. A buffered frame does not imply that playback should run. Paused means the relative position, displayed frame and future caption time all hold. Resume changes intent without creating a new session or restarting FFmpeg.
+Required tests: Stop before Start acknowledgement; timeout then a newer Start; delayed old handler arriving/finishing after newer intent; cancelled request retry; stale cancellation after a fresh Start. An old request must not stop newer playback or spawn abandoned replacement work. Verify both controlled transport ordering and real HTTP behaviour where applicable.
 
-| State | Select action | Back/Home |
+The inherited lease is eventual cleanup for unreachable work, not a guarantee that old Starts cannot supersede newer ones. Do not declare this gate passed by waiting for expiry. Neither prerequisite is fixed merely by committing these plans.
+
+## 3. Shared boundaries and timing contract
+
+Keep one server-configured source, current LCD profile, configured extract bounds and existing maximum request length. No Plex, Docker, audio, new qualities, live ASCII mode, public authentication, persistent live resume, autoplay-next, persistent cache or cache-reuse seeking. Preserve static/Pages functionality and local-only entry/script isolation.
+
+One bridge clock, one animation chain, one active polling timer and a bounded rolling source cache. The adapter owns transport, not time or rendering. Reuse saved modules. An actual prerequisite defect gets its own small fix and regression test.
+
+Maintain three distinct values:
+
+- Relative playback position: smooth position within the current stream. Do not re-quantise this clock on every render.
+- Presented source time: actual frame timestamp, authoritative for captions and held-picture state.
+- Original-extract progress: source position minus the original range_start, with duration original range_end minus range_start.
+
+On every stream, requested source time equals current source_start plus current relative position. After seeking, reset only the current-stream clock, not the user's original-extract progress basis.
+
+Normal buffering targets remain four seconds at startup and about two seconds on recovery. Both need an EOF-tail exception: if conversion is complete and playable contiguous footage remains, play the shorter tail instead of waiting for a target that cannot be reached. Test sub-chunk and one-frame tails while rebuffering.
+
+## 4. 5A.4: Pause/Resume and playback lifecycle
+
+5A.3 already requires minimum Stop/Back cleanup. Extend and verify that controller rather than creating a second lifecycle implementation. New work is Pause/Resume plus safe navigation, replacement and visibility interactions.
+
+### State and controls
+
+Separate user intent from readiness. Paused holds relative position, frame and eventual caption time. Resume changes intent without a new session or FFmpeg restart; an already completed conversion can resume from retained data without creating a replacement worker.
+
+| State | Select/key 5 | Back/Home |
 | --- | --- | --- |
 | Starting, before metadata | Stop/cancel | Stop/cancel and leave |
 | Buffering with play intent | Pause | Stop and leave |
 | Playing | Pause | Stop and leave |
 | Paused | Resume | Stop and leave |
-| Ended or unrecoverable error | Clearly labelled return/restart action | Leave safely |
+| Ended/error | Honestly labelled return/restart | Leave safely |
 
-Footer text and accessible labels must match the actual action on each handset. Do not show PLAY or RESUME when the action will silently restart from the beginning.
+Footer/accessibility labels must match every model's actual action. Do not present a restart-from-beginning as Resume.
 
-### Pause and buffering
+### Buffer and lifecycle rules
 
-- Freeze the existing bridge clock immediately on Pause. Keep the last frame visible.
-- Continue foreground heartbeats with paused intent so the session lease remains valid.
-- Reuse the adapter's initial prefill rule: a pause before the first picture must not prevent the target frame/buffer from being generated.
-- Once warmed, pause generation using the existing API flag. Allow for one in-flight chunk and pipe buffers; do not assert instant zero work.
-- Resume from the same position. If data is missing, remain in buffering until ready rather than advancing the clock or creating another worker.
-- A paused final frame must not become a false buffering loop; preserve explicit EOF handling.
+Freeze the bridge clock immediately on Pause. Keep foreground heartbeats with paused intent. Preserve the corrected initial-prefill exception so the first frame can arrive before parking the worker. Once warmed, honour pause after ordinary eviction; allow one in-flight chunk and pipe buffers, not an instant-zero-work promise.
 
-### Navigation and replacement
+Resume at the same position. If more data is needed, buffer without advancing or creating another session. Apply the short-tail/EOF rules from section 3.
 
-Capture the launch page and focus so Back returns to the correct details/collection rather than an unrelated Home screen. Invalidate bridge generations before asynchronous cleanup. The adapter's queue remains responsible for acknowledged ownership release.
+Capture the launch page/focus. Back/Home, repeated Play, replay and live/static switching invalidate bridge generations before asynchronous cleanup. The source queue owns acknowledged release. No stale repaint or state replacement, duplicate timers/animation loops, competing live sources or writes into static progress storage. The Start prerequisite also applies to these flows.
 
-Live-to-static, static-to-live, repeated Play and replay must leave only one active live source, timer and animation chain. Late callbacks cannot repaint a menu, change static playback or overwrite the state of a replacement session. Do not write live progress/completion into the static progress store.
+### Visibility and terminal reasons
 
-### Visibility and expiry policy
+Once 5A.4 passes, it replaces 5A.3's provisional stop-on-hide policy: hiding pauses immediately; returning to a valid session leaves it paused until explicit Resume. Background heartbeat timers may stop, so lease expiry remains possible. Do not weaken the lease to disguise this.
 
-5A.4 deliberately supersedes 5A.3's provisional stop-on-hide policy: hiding the page pauses live playback immediately. Returning to a still-valid session leaves it paused until the user explicitly resumes.
+Only show SESSION EXPIRED when a reason is verified. Current generic stopped/404 responses do not by themselves distinguish expiry, explicit stop or replacement. Either add a narrow structured reason or use SESSION ENDED - RESTART when ambiguous. Transport timeout and conversion failure remain separate.
 
-Do not assume background heartbeat timers always run. If the inherited lease expires, show SESSION EXPIRED and offer an explicit restart from the configured beginning. Do not claim a position-preserving resume or silently seek; that recovery is not implemented in 5A.4. Do not weaken the server lease merely to hide the issue.
+Recovery from an ended/expired session is an explicit restart from the configured beginning. No false position-preserving resume, silent seek or automatic new worker. Page exit still attempts cleanup; beacons/lease are fallback mechanisms, not confirmed network delivery.
 
-Stop, Home and page exit still release the navigation. A best-effort beacon and the existing lease remain fallback mechanisms, not proof of confirmed cleanup after network failure.
+### Input identity
 
-### Physical control identity
+Freeze an explicit input-origin/action matrix before wiring controls: numeric keypad, keyboard arrows, physical rocker, and 7110 roller click/movement/wheel. Do not map all of these solely by their final numeric digit. Use a narrow local bridge action layer so physical Up cannot later toggle numeric-2 captions or accidentally seek; static handlers remain delegated unchanged.
 
-Resolve semantic actions from the actual keyboard/DOM input, not only the final numeric key value. Arrow-up, a physical rocker/roller and numeric 2 must not accidentally become the same live action. Use a narrow local bridge action mapping/delegation; do not redesign the public handset controls. This distinction is required for captions and seeking in the following checkpoints.
+### Passes and acceptance
 
-### Small passes and gate
+1. 5A.4A: intent/state and Pause/Resume tests only.
+2. 5A.4B: navigation/replacement, input mapping, action labels and timer ownership.
+3. 5A.4C: visibility/terminal reason handling and live-server/browser acceptance.
 
-1. 5A.4A: state/intent tests and Pause/Resume; no caption or seek logic.
-2. 5A.4B: navigation/replacement, model-specific action labels and timer ownership.
-3. 5A.4C: visibility/lease expiry, live-server and browser acceptance.
+Gate: pause after buffer eviction, resume with the same session, pause while buffering and near EOF, leave during Start/play/buffering, switch to static and play live again. Verify focus, held position, cleanup, bounded memory, timer/worker counts and expiry recovery.
 
-Gate: pause for several seconds, resume without a new session ID/worker, leave during startup/buffering/playing, switch to static and start live again. Confirm correct focus, no stale repaint, bounded buffers and one timer/worker. Test expiry rather than only the happy path.
+## 5. 5A.5: source-time handset captions
 
-## 4. 5A.5: source-time handset captions
+Connect existing SRT metadata to the frame actually displayed inside the handset. Do not rebuild the parser, download tracks, add per-frame caption requests or put the diagnostic DOM subtitle panel below the phone.
 
-### Goal
+### Selection and presentation
 
-Connect the already available SRT metadata to the actual frame displayed inside the handset. Do not rebuild the parser, download subtitles, add per-frame caption requests or attach the diagnostic DOM caption panel below the phone.
+M3/M4 cue times are absolute source seconds. Match using the presented frame's sourceTime, not smooth target time, wall time or response timing. Start is inclusive; end is exclusive. Matching is quantised to video frames, not an audio-sync or sub-frame guarantee. Never add source_start twice or mix source cues with static clip-relative timestamps.
 
-### Timebase contract
+Pause and rebuffering hold the caption with the held frame, including a missing-chunk boundary. Use a small pure cue selector if useful; the bridge retains display ownership. Render with existing handset text/palette, bounded wrapping and a sensible line limit. Preserve overlap order and suppress duplicate repeated lines without a typography redesign.
 
-M3/M4 metadata uses absolute source seconds. Select cues using the presented frame's sourceTime from the adapter, not wall time, an uncommitted playback target, request completion time or a second offset calculation.
+Numeric 2 toggles captions only in live playback. Physical scroll/ArrowUp is distinct under the 5A.4 matrix. Toggling does not change position or picture. Default live preference is on per page; preserve it across live plays, pauses and seeks until reload without changing static preferences or adding persistent settings.
 
-- Cue start is inclusive; cue end is exclusive.
-- Matching is quantised to the actual video frame rate. No audio-sync or sub-frame accuracy claim.
-- A held frame during pause/rebuffering holds its caption, including at a missing-chunk boundary.
-- Do not add source_start twice or compare source-time cues with static clip-relative subtitles.
+Missing track, no cue in the window and malformed-cue warnings stay distinct; an empty list is not a playback failure. Treat all caption content as text; any diagnostic/accessibility DOM uses textContent, not innerHTML. Announce changed cues, not every animation frame.
 
-### Presentation and controls
+### Lifetime
 
-Render through the existing handset text style/palette and wrapping constraints, not a second external player. Use a small pure cue-selection helper if needed, with the bridge owning display integration. Keep the picture unchanged when caption visibility toggles.
+Cue metadata belongs to the active generation. Clear on Stop, replacement, terminal errors and EOF. Late responses cannot restore another session's text. Source/SRT edits still require the documented server restart; no track-selection API or watcher.
 
-- Numeric key 2 toggles captions only in live playback. Physical scroll controls/ArrowUp must not accidentally toggle them. Menus and static playback retain their current behaviour.
-- Default live caption preference is on when the page loads. Keep this page-local preference across live plays, pauses and seeks until reload; do not overwrite static caption preferences or introduce persistent settings in this checkpoint.
-- Missing track, no cues in the extract and malformed-cue warnings must remain distinct. An empty cue list is not a playback error.
-- Use the existing compact subtitle area, bounded wrapping and a sensible line limit. Preserve overlap order and avoid duplicate repeated lines. Do not expand into a general typography/layout project.
-- Treat caption content as text. Debug/accessibility DOM output uses textContent, never innerHTML. Do not announce unchanged text on every animation frame.
+### Passes and acceptance
 
-### Lifetime and races
+1. 5A.5A: pure selection tests for offsets, boundaries, overlaps and empty tracks.
+2. 5A.5B: handset rendering, numeric toggle and page-local preference.
+3. 5A.5C: pause/buffer/replacement and actual browser checks.
 
-Caption metadata belongs to the active source generation. Stop, replacement, errors and end-of-clip clear old text. A new session cannot inherit another session's cue list. A late response cannot restore old captions after leaving playback. Source file/SRT changes still require the documented server restart; no file watcher or track-selection API is added.
+Gate: pause during a cue, toggle off/on without movement, force buffering at a cue boundary, Stop/Start and return to static. Text must match the presented frame, wrap correctly, clear safely and never execute markup.
 
-### Small passes and gate
+## 6. 5A.6: handset restart-seeking
 
-1. 5A.5A: pure source-time cue selection tests, including clip offsets, boundaries, overlaps and empty tracks.
-2. 5A.5B: handset rendering, numeric-key toggle and page-local preference.
-3. 5A.5C: pause/buffering/replacement integration and browser checks.
+The current adapter has no seek() method. Add and test that transport operation before wiring handset controls. No ad-hoc parallel fetch implementation in the bridge. This remains restart-seeking even for recent targets; cached fast paths, persistent cache, thumbnails and desktop sliders are excluded.
 
-Gate: pause in an active cue, toggle off/on while paused, force rebuffering, Stop/Start and switch to static playback. The cue must stay with the held picture, toggle without moving position, clear on exit and never execute markup. Verify actual handset wrapping and source-offset timing in a browser.
+### Source adapter contract
 
-## 5. 5A.6: handset restart-seeking
+- Retain navigation identity/original allowed range while invalidating visible metadata, old chunks and client generations.
+- Assign increasing safe-integer revisions; serialize lifecycle work and skip queued requests already superseded.
+- Use /api/seek with navigation_id, revision and absolute source position. Do not navigation-stop before a normal seek; it would invalidate the navigation being sought.
+- Adopt the returned session ID, snapped source_start, geometry and caption window only for the latest generation/revision. New chunk indices start at zero. Never mix session caches.
+- Preserve acknowledged ownership on errors so failed cleanup cannot be bypassed by Start. Existing timeouts and reviewed Start fencing still apply.
 
-### Goal and prerequisite gap
+Stop uses /api/navigation/stop. A Stop during seek must invalidate that navigation and release any replacement, even when responses are pending. A new Start creates a new navigation ID; stale cancellation cannot stop it.
 
-Connect handset seek controls to the existing M4A API, including paused seeking, captions and cancellation. The 5A.2 adapter currently has no seek() method: explicitly plan and test that extension first. Do not issue ad-hoc seek fetches from the handset bridge or create a second transport/lifecycle implementation.
+### Rejection handling
 
-This is restart-seeking only. Even a recently buffered target may restart conversion. Cached-position seeking, persistent cache and preview thumbnails stay out of scope.
+HTTP 409 is not automatically harmless. Ignore only responses already known to be superseded by local generation/revision. A 409 for the latest active operation must leave the seeking state, show an actionable error and allow safe cleanup/restart. Never suppress every 409 or leave an endless seeking overlay.
 
-### Adapter extension
+### Intent and time
 
-Add a source-time seek operation to stream-source.js with a documented return contract. It must:
+A playing seek resumes only after buffering. A paused seek presents the target but stays paused, using corrected prefill before parking. Preserve caption preference; clear old text immediately and show target cues only when a target frame is presented. A hidden page cannot auto-start when the seek finishes.
 
-- Retain the navigation identity and original allowed range while clearing old visible metadata/chunks.
-- Invalidate client generations immediately so old pulse/chunk replies cannot be adopted.
-- Assign increasing safe-integer seek revisions and serialize lifecycle operations. Skip queued seek work that is already superseded instead of needlessly spawning it.
-- Call /api/seek with navigation_id, revision and absolute source position. Do not call navigation-stop before an ordinary seek: that would invalidate the navigation being sought.
-- Adopt the returned session ID, authoritative snapped source_start, frame geometry and caption window only for the latest generation/revision. Chunk indices restart at zero for that returned stream.
-- Clear/rebuild the bounded rolling buffer; never mix chunks from old session IDs.
-- Keep acknowledged ownership through failures so a new Start cannot bypass failed cleanup. A failed or expired navigation requires explicit recovery, not silent new-session creation.
+Clamp to the original configured range and last renderable frame, never an invalid EOF start. The server-returned snapped position is authoritative. Test fractional offsets, boundary rounding and one-frame tails. Do not extend extract limits.
 
-Stop remains /api/navigation/stop. If Stop occurs during an in-flight seek, the final queued cancellation must release the current navigation and prevent late work/replies from restoring playback. A newer Start gets a new navigation ID; stale cancellation of the old navigation must not stop the new one. Preserve existing request timeouts and lease fallbacks.
+Reset current-stream relative position for the returned source_start, but preserve the section 3 progress basis. Progress must not restart at zero or shrink its total duration after every seek. EOF must not become buffering.
 
-### Seek intent and timeline
+### Handset mapping
 
-- A seek while playing resumes only after the new buffer is ready.
-- A seek while paused shows the target frame but stays paused. Use initial prefill so paused generation cannot deadlock before the frame arrives.
-- Preserve the page-local caption on/off preference. Clear old caption text immediately and display target captions only after the target frame is actually presented.
-- If the page becomes hidden during a seek, do not auto-start playback when its response arrives.
-- Treat the server-returned position as authoritative; M4A snaps on its grid relative to the configured extract start.
-- Clamp controls to the allowed extract and last renderable frame, never exactly to an invalid EOF start. Do not expand beyond the configured extract or alter the engine duration limit.
+Numeric 4/6 retain the handset convention of minus/plus five source seconds; diagnostic buttons may remain ten seconds. Labels and accessibility text must agree. Select/key 5 stays Pause/Resume; numeric 2 stays captions; Back/Home cancel and leave. Quality/ASCII changes remain unavailable.
 
-The bridge's relative clock resets for the returned stream, but the user's displayed progress remains relative to the original configured extract:
+Use the explicit model/input matrix from 5A.4. In particular, 7110 roller movement must not pass through the numeric-2 caption action. Preserve menus/static behaviour and avoid duplicate controls outside the phone.
 
-source time = current stream source_start + current stream relative position
+### Passes and acceptance
 
-presentation position = source time - original range_start
+1. 5A.6A: adapter extension with ordering, timeout, cancellation, active/stale 409 and ownership tests.
+2. 5A.6B: bridge position/intent/caption reset and progress accounting.
+3. 5A.6C: model mapping plus real-server/browser regressions.
 
-presentation duration = original range_end - original range_start
+Gate: forward/back playing and paused seeks, rapid repeats, seek then Stop/Home, seek then new Start/static, hidden seek, latest and stale rejection, fractional/boundary/final-frame targets. Latest intent wins; picture/caption agree; superseded workers are reaped before replacement.
 
-Do not make the progress display jump back to zero or shrink its total duration after every seek. Distinguish EOF from buffering, including one-frame tails.
-
-### Handset control mapping
-
-Retain the existing handset convention: numeric 4/6 seek backward/forward five source seconds. The diagnostic viewer may keep its separate ten-second buttons. Keep labels/accessibility text consistent with the actual handset increment.
-
-Select/key 5 remains Pause/Resume from 5A.4. Numeric 2 remains captions from 5A.5. Back/Home remain cancellation/exit. Quality and ASCII switching are still unavailable for the fixed live profile.
-
-Confirm physical rocker/roller/keyboard mappings against the actual current DOM and model API. In particular, 7110 roller movement during live playback must not be routed through the numeric-2 caption shortcut. Use the local semantic-action mapping established in 5A.4; preserve model behaviour outside the live view. Do not add a desktop seek slider or duplicate controls outside the phone in this milestone.
-
-### Small passes and gate
-
-1. 5A.6A: adapter seek extension with mocked ordering, cancellation and cleanup tests; no UI change.
-2. 5A.6B: bridge position/intent/caption reset and source-time progress accounting.
-3. 5A.6C: handset control mapping and live-server/browser regression checks.
-
-Gate: forward/back seeks while playing and paused; rapid repeated seeks; seek then immediate Stop/Home; seek then new Start/static selection; hidden-page seek; timeout/stale 409 response; final-frame target. Latest intent must win, captions must match the presented target frame, and superseded workers must be reaped before replacement.
-
-## 6. Cross-checkpoint failure matrix
+## 7. Failure and regression matrix
 
 | Situation | Required result |
 | --- | --- |
-| Pause before first frame | Bounded prefill, target picture, no clock advance |
-| Pause during rebuffering | Remain paused when more data arrives |
-| Hidden page with valid lease | Pause; remain paused on return |
-| Hidden page after lease expiry | Clear expiry/restart state; no false resume |
-| Back/Home during Start | Leave immediately; reject late UI work; clean acknowledged ownership |
-| Rapid seeks or out-of-order response | Latest generation/revision only |
-| Stop while seek is pending | Navigation invalidated; no late frame/caption resurrection |
-| Old cancellation after a new Start | New navigation remains unaffected |
-| Cleanup request fails | No silent replacement worker; explicit error and lease fallback |
-| End of stream or partial final chunk | Final picture/completion, not infinite buffering |
-| Static item opened after live | Original static clock, controls and preferences work |
+| Pause before first picture | Bounded prefill, held clock |
+| Pause after original chunks are evicted | Server receives paused=true |
+| Completed tail shorter than buffer target | Play remaining frames and finish |
+| Hidden page with surviving lease | Remain paused on return |
+| Unknown stopped/404 reason | Neutral ended/restart message, not invented expiry |
+| Start timeout followed by delayed old work | Reviewed server ordering/cancellation protects latest intent |
+| Back/Home during Start | Immediate UI exit; no late resurrection; ownership cleanup |
+| Old seek response | Ignore only when locally superseded |
+| Latest seek 409 | Exit seeking, expose error and cleanup |
+| Stop during seek or cancellation after new Start | Cancel correct navigation only |
+| Cleanup fails | No silent replacement; explicit error/fallback |
+| Static playback after live | Original controls, clock and preferences work |
 
-## 7. Test and release discipline
+## 8. Delivery and completion discipline
 
-Each sub-pass should normally touch one or two implementation files plus focused tests. Record the exact changed files, baseline versions, test commands/results, known limitations and next gate. Do not claim a passed test solely because a file exists or a previous checkpoint passed.
+Normally touch one or two implementation files plus focused tests per pass. Save each pass before advancing; record file versions, exact tests/results, limitations and next gate. Do not rebuild M1-M4 or equate file presence with success. Stage only intended source/test/docs, not new source media, full SRTs, tokens, backups, debug output or archives; existing repository cleanup is separate.
 
-Use layered validation:
+Validate in layers: controlled adapter/cue/state tests; real HTTP/FFmpeg with generated video and deterministic SRT; real browser inside all five handset control layouts; N5105/LAN manual acceptance with forced delay and Stop/restart. Distinguish mocked, browser, host throughput and security results. Browser acceptance stays pending if not run. Screenshots alone do not prove cleanup or timing.
 
-1. Pure adapter/cue/state tests with controlled timing and transport.
-2. Real HTTP/FFmpeg integration with generated footage and deterministic SRT cues.
-3. Browser interaction inside the actual handset, including all five model control layouts.
-4. Manual verification on the N5105/LAN setup, including buffering and Stop/restart.
+Keep current M1-M4, 5A.1/5A.2 and completed 5A.3 regressions where shared behaviour changes. Preserve fallback entry points and narrow rollback. No public Pages catalogue/script changes unless separately required.
 
-Keep fake-DOM tests, real-browser tests, host throughput and production/security validation clearly distinct. If browser tooling is unavailable, mark that gate pending rather than bundling an unverified completion claim. Screenshots alone do not prove worker cleanup or timing.
+Expected code locations remain handset-live.js, stream-source.js, a small cue helper if useful and focused tests. Backend changes are restricted to isolated reviewed prerequisite fixes or demonstrated defects, not a fresh server per feature.
 
-Check current regression suites for M1-M4, 5A.1/5A.2 and the completed 5A.3 connection where shared behaviour is affected. Keep a working fallback entry point and make it easy to revert only the current narrow checkpoint. No public Pages script/catalogue changes without a specific separate requirement.
-
-Proposed code locations are the established handset-live.js controller, stream-source.js adapter, a small source-time caption helper if useful, and focused tests. Do not create new server generations or copy entire earlier stacks for each feature. Keep backend changes isolated to a proven defect or missing API requirement.
-
-## 8. Stage 5 completion gate
-
-Stage 5 is complete only when one fixed on-demand source works inside the handset with Start, Pause/Resume, source-time captions, restart-seeking, Back/Home and reliable replacement/cleanup, while static playback remains intact.
-
-Demonstrate the full sequence: Play -> Pause -> caption toggle -> paused seek -> Resume -> rapid seeks -> Stop -> static sample -> live Play again. Repeat across the supported handset controls, exercise a slow connection/forced delay and verify worker/timer/cache bounds.
-
-The final record must list what was actually tested on the host/browser and what remains limited. Docker, Plex/library browsing, persistent resume, cache-reuse seeking, new qualities, public authentication and audio remain later milestones, not implied Stage 5 functionality.
+Stage 5 completion requires one fixed source inside the handset with Start, Pause/Resume, source-time captions, restart-seeking, Back/Home and reliable replacement/cleanup, while static playback remains intact. Demonstrate Play -> Pause -> caption toggle -> paused seek -> Resume -> rapid seeks -> Stop -> static sample -> live Play, across model controls and with buffering/timeout cases. Record actual browser/host results and limits. Docker, library browsing, persistent resume, cached seeking, qualities, public authentication and audio remain later milestones.

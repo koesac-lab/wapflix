@@ -1,256 +1,153 @@
 # Handset 5A.3: fixed on-demand stream integration plan
 
-Status: planning only. This document does not implement live handset playback. Runtime code, media, existing milestones and the Pages workflow are unchanged.
+Status: reviewed plan, 2026-10-20. Documentation only: no implementation, test deployment or host validation is claimed. This revision incorporates the Stage 5 review and must be read with HANDSET_STAGE5_REMAINING_PLAN.md.
 
-## Goal
+## 0. Blocking prerequisite gates
 
-Connect one server-configured video to the existing handset interface so selecting it starts on-demand conversion and displays LCD frames inside the phone. Support starting, initial buffering, progressive frame display, rebuffering, Stop/Back, natural completion and errors. Preserve all existing static playback.
+Do not begin the handset connection until these narrow prerequisites have their own fixes and regression results:
 
-The M4 diagnostic viewer remains the working fallback. Do not rebuild the M1-M4 stack as part of this milestone.
+1. 5A.2R1: correct adapter startup readiness after rolling-buffer eviction. The current poll logic depends on chunks 0 and 1 remaining cached. A focused reproduction showed a later Pause requesting true but sending paused=false after chunk 0 was evicted. Readiness must persist for the current stream generation and reset only for a new/replaced/seek stream, not ordinary eviction.
+2. 5A.2R2: resolve the unacknowledged-Start cancellation contract. A timeout/late-handler simulation showed the client owning a newer Start while an older delayed Start replaced it server-side. This is a demonstrated protocol risk in a controlled simulation, not a reported N5105 incident. Specify and test pre-acknowledgement request identity, ordering and cancellation; make any required server fence a separate narrow change. A lease is eventual cleanup, not a latest-Start-wins guarantee.
 
-## 1. Scope
+Detailed requirements and tests are in HANDSET_STAGE5_REMAINING_PLAN.md. Neither issue is fixed merely by committing this plan. Do not bury these fixes inside the handset bridge or weaken the acceptance criteria to conceal them.
+
+## 1. Goal and scope
+
+Connect one server-configured source to the existing handset. Selecting its local entry starts on-demand conversion and displays progressive LCD frames inside the phone. Support Start, buffering, frame presentation, Stop/Back, natural completion and errors. Preserve static playback and the M4 diagnostic fallback.
 
 | Included | Deferred |
 | --- | --- |
-| One fixed local streaming entry | Plex or filesystem browsing |
-| Same-origin handset and API hosting | Docker or reverse-proxy deployment |
-| Existing 240-pixel LCD profile | Quality switching |
-| Start, render and Stop | User-facing Pause |
-| Buffering and natural completion | Caption display |
-| Back/Home cleanup | Seeking controls |
-| Existing static entries still work | Live resume, progress persistence and autoplay-next |
+| One fixed local streaming entry | Plex/filesystem browsing |
+| Same-origin handset and API | Docker/reverse-proxy deployment |
+| Current 240-pixel LCD profile | Quality switching or live ASCII mode |
+| Start/render/Stop and buffering | User-facing Pause |
+| Back/Home cleanup and EOF | Caption display and seeking controls |
+| Static playback unchanged | Live resume/progress persistence and autoplay-next |
 
-Caption metadata may still arrive from the backend, but this checkpoint does not display it. Do not expose controls that appear to support live seeking, quality changes or ASCII mode.
+Caption metadata may arrive but is not displayed yet. Do not expose controls that promise unsupported features. Keep the existing extract limits; this milestone does not add unrestricted whole-video playback or rebuild M1-M4.
 
-## 2. Integration constraint: static clips are not rolling streams
+## 2. Static clips are not rolling streams
 
-The reviewed player.js reads clip.frames directly and derives duration from clip.frames.length / clip.fps. The reviewed streaming.js uses that duration for progress saving, completion and autoplay-next. Making a rolling stream pretend to be a complete static clip would expand the task substantially.
+The reviewed player.js reads clip.frames and derives duration from clip.frames.length / clip.fps. streaming.js also uses that duration for progress, completion and autoplay-next. Do not make a rolling stream impersonate a complete static clip.
 
-Recommended approach: introduce a distinct live playback view, such as live-player, while preserving the static player view. For live playback:
+Use a distinct live view, such as live-player, and keep clip unset for it. The bridge uses the 5A.2 source adapter, current canvas/controls and captured return screen. It bypasses static persistence/completion/autoplay logic. Static items delegate to the existing path unchanged. No dummy arrays, placeholder variants or growing whole-video frame list.
 
-- Keep clip unset instead of fabricating a complete frame array.
-- Use the existing 5A.2 adapter as the source.
-- Use the existing handset canvas and controls.
-- Capture the launch screen for the return path.
-- Bypass static progress persistence, completion detection and autoplay-next.
+Reviewed source baseline: player.js d6f971a2b7487d286e0264a7b74a64ec3206a0ba; streaming.js 01aef733a4dbdf716f42f3f678b20427320b51d7; tools/handset_static_preview.py 2b1d146dffa5c562a98cc2feccebd775eb260d01. Check actual local versions before implementation; these are review records, not a claim that later files remain identical.
 
-For every static item, delegate to the existing implementation unchanged. Do not create placeholder asset URLs, dummy frame arrays or a growing whole-video clip.frames list.
+## 3. Same-origin host and security boundaries
 
-Source review baseline: player.js d6f971a2b7487d286e0264a7b74a64ec3206a0ba; streaming.js 01aef733a4dbdf716f42f3f678b20427320b51d7; tools/handset_static_preview.py 2b1d146dffa5c562a98cc2feccebd775eb260d01. Check actual local files and local-only milestone work before implementation; these are reviewed blob IDs, not a claim that every later checkout remains identical.
-
-## 3. Same-origin local host
-
-The 5A.1 preview on port 8102 and API on 8101 are different browser origins. Solve this through hosting rather than disabling CORS, Host or Origin checks.
-
-Proposed new entry point: tools/handset_live_preview.py. Proposed independent default port: 8103, so existing diagnostic and static servers can remain available.
+The 8102 handset preview and 8101 API are different browser origins. Add a local entry point, provisionally tools/handset_live_preview.py on port 8103, instead of disabling CORS/Host/Origin checks. Existing fallback servers can stay independent.
 
 | Route | Purpose |
 | --- | --- |
-| / | Existing handset page with local-only integration scripts |
-| /assets/catalogue.json | Existing catalogue plus one in-memory live entry |
-| Existing frontend and referenced asset routes | Static handset functionality |
-| /stream-source.js | Existing 5A.2 adapter |
-| /handset-live.js | New handset bridge |
-| /api/start | Existing session creation |
-| /api/pulse | Existing heartbeat/status |
-| /api/chunk | Existing chunk delivery |
-| /api/navigation/stop | Existing navigation cancellation |
+| / | Existing handset with local-only integration scripts |
+| /assets/catalogue.json | Served catalogue copy with one virtual live entry |
+| Existing allowlisted frontend/asset routes | Static playback |
+| /stream-source.js | Existing transport adapter |
+| /handset-live.js | New bridge |
+| /api/start, /api/pulse, /api/chunk | Existing streaming operations, with reviewed prerequisite fixes where required |
+| /api/navigation/stop | Acknowledged navigation cleanup |
 
-Hosting rules:
+Reuse the M4 API/session implementation and 5A.1 static allowlisting. Do not serve the repository as a directory or expose source media, tools, backups or Git internals. Do not rewrite the public catalogue, Pages workflow or generated assets. Preserve LAN binding and explicit trusted hostname aliases.
 
-- Reuse the M4 API handler and session implementation.
-- Reuse the 5A.1 static-file allowlisting approach.
-- Do not expose the repository as an unrestricted directory.
-- Do not edit the public catalogue or Pages workflow.
-- Do not regenerate video assets.
-- Preserve LAN binding, trusted hostname aliases and Host/Origin checks.
-- Keep static .gz assets without Content-Encoding because the static player decompresses them explicitly. API chunks retain ordinary HTTP gzip Content-Encoding. Test both paths.
+Static .gz assets must still omit Content-Encoding because their player decompresses explicitly. API gzip chunks retain ordinary HTTP Content-Encoding. Test both.
 
 ### Capability and CSP
 
-Inject the API capability into a namespaced, local-only configuration object. Do not add a global variable named token: the existing handset already uses a numeric token to invalidate older static loads.
+Inject capability/configuration in a namespaced local object. Never add a global token variable: the handset already uses a numeric token for static-load invalidation.
 
-The generated handset HTML, configuration script and CSP header must agree on their script nonce. Do not combine the static preview's nonce and backend nonce without reconciling the response headers.
+Use a consistent nonce for served bootstrap/configuration and its CSP header. Do not mix independent preview/backend nonces without reconciling headers. Capability data is dynamic, not committed, included in catalogue files or persisted in local storage. This is trusted-network development access, not public-user authentication. The browser cannot choose arbitrary source paths or URLs.
 
-The capability belongs in the dynamically served page, not Git, the catalogue or local storage. This remains trusted-network development access, not public-user authentication. No arbitrary media path or URL is accepted from the browser.
+## 4. One virtual entry
 
-## 4. One virtual catalogue entry
+Proposed local-only entry: id local-stream-test; title Local stream test; explicit playback type local-stream; source identity configured-test. It appears at Home -> Original Transmissions -> Local stream test -> Play.
 
-Append one entry to the local host's served catalogue copy:
+Append only to the served catalogue copy. Keep the original static test entry and on-disk catalogue intact. The entry must not contain fake static variants or be recognised through an ID substring. Source selection stays server-configured.
 
-- ID: local-stream-test
-- Title: Local stream test
-- Playback type: local-stream
-- Source identity: configured-test
+Fail startup clearly if a required bridge/adapter is missing. Do not expose a broken live entry or add it to public Pages/standalone static preview.
 
-Use the existing navigation path: Home -> Original Transmissions -> Local stream test -> Play.
+## 5. Local-only bridge
 
-The backend source remains configured on the server. The entry has an explicit playback discriminator, not fake static variants. Do not infer streaming from an ID substring or replace the existing static test entry. The original catalogue stays unchanged on disk.
+Proposed script: handset-live.js. Script order: existing inline bootstrap, player.js, streaming.js, theme.js, sharing.js, stream-source.js, handset-live.js.
 
-If a required bridge or adapter is absent, fail startup clearly rather than exposing a broken live entry. Public Pages and the standalone static preview must not receive this entry.
+The bridge owns live-entry recognition, return-screen capture, adapter lifecycle, live state, polling, frame presentation, live-only controls and callback invalidation. It does not replace the catalogue/navigation system.
 
-## 5. Handset bridge
+States: Idle -> Starting -> Buffering -> Playing; Playing can return to Buffering; EOF leads to Ended; active states can enter Error or Stopping and return to navigation. Ended/Error have a clear Back path. Re-entering Play creates a fresh session; no automatic retry or next-item start.
 
-Proposed new script: handset-live.js. Load it after the existing wrappers so static delegation preserves their final behaviour.
+## 6. Clock, presented frames and polling
 
-Proposed script order:
+Keep three concepts distinct:
 
-1. Existing inline handset bootstrap.
-2. player.js
-3. streaming.js
-4. theme.js
-5. sharing.js
-6. stream-source.js
-7. handset-live.js
+- Relative playback position: smooth position within the current stream, advanced by the bridge's single clock only when appropriate.
+- Presented source time: timestamp of the frame actually drawn; authoritative for visual state and later captions.
+- Extract progress: position relative to the original configured range; becomes important after seeking in 5A.6.
 
-The bridge owns only:
+For this milestone: requested source time = stream source_start + relative playback position. frameAt() returns the actual quantised presented time. Do not repeatedly quantise the smooth clock itself to frame boundaries, double-add offsets or use request/wall time for display synchronisation.
 
-- Recognition of the live entry and capture of its return screen.
-- Adapter start/stop and live playback state.
-- Adapter polling and frame presentation on the existing canvas.
-- Live-only control restrictions.
-- Rejection of callbacks belonging to an abandoned live view.
+Exactly one requestAnimationFrame chain must remain. The static tick must not also advance live position. Tests count scheduled callbacks. Reset timing references at view changes; freeze during startup, rebuffering and stopping.
 
-It must not take over the entire catalogue or replace the navigation system.
+Use one heartbeat/prefetch timer around the established 250 ms cadence, active only for the acknowledged live session and during buffering. Let the adapter coalesce requests. Clear it on exit; repeated Play cannot accumulate intervals.
 
-### State model
+For 5A.3 only, hiding the page stops live playback and returns to details. Do not depend on continued background rendering. 5A.4 explicitly replaces this provisional policy with Pause/Resume after that checkpoint passes.
 
-Idle -> Starting -> Buffering -> Playing. Playing may return to Buffering. Natural completion leads to Ended. Active states may lead to Error or Stopping, followed by the previous navigation screen.
+## 7. Buffering and EOF
 
-Ended and Error must provide a clear return path. Starting again from the details page creates a fresh session. No automatic retry or next-item playback.
+Startup target: four seconds of contiguous footage, with a short-completed-extract exception when at least one playable frame exists.
 
-## 6. One playback clock and one animation chain
+On underflow, hold the last image and position, show BUFFERING and keep polling. Normal recovery target is one two-second chunk. Crucially, if conversion is complete and less than that target remains, play the available contiguous tail through EOF. Never wait for two seconds that cannot exist. Test sub-chunk and one-frame tails during rebuffering, not only at initial startup.
 
-The adapter has no playback clock. Retain the handset's existing relative playback position and convert it for adapter calls:
+Use configured duration initially and the final frame count when available. EOF is a separate state transition, not an indefinitely missing future chunk. Present the final frame, stop clock/polling, release ownership and show TRANSMISSION ENDED with Back. No autoplay-next.
 
-source time = stream source_start + relative playback position
+## 8. Rendering and controls
 
-Use the returned frame timestamp as the authoritative displayed-frame position. Advance only when the required frame is available. Freeze during startup, buffering and stopping. Reset timing references when entering or leaving live playback.
+Use the current canvas, scene area, ink/LCD palette, nearest-neighbour scaling and transparent background/backlight behaviour. Decode only the chosen hex-msb frame. Do not refactor the static renderer merely to share a short pixel loop. Memory remains the bounded adapter window, current frame and canvas buffers.
 
-There must be exactly one requestAnimationFrame scheduling chain. Add a live branch around the existing tick path; do not leave the original loop running alongside a second loop. The static tick must not also advance the position during live playback. Tests should count scheduled callbacks.
-
-### Network polling
-
-Use one active heartbeat/prefetch timer, initially around the established 250 ms cadence. Start it for an acknowledged live session, keep it running during buffering, let the adapter coalesce overlapping requests and clear it on exit. Repeated Play must not accumulate intervals.
-
-### Hidden pages
-
-For this limited checkpoint, hiding the page stops the live session and returns to its details screen rather than adding hidden-tab pause/resume behaviour. Browsers commonly suspend animation callbacks in hidden tabs, so cleanup must not depend on continued rendering. Manual Play is required again on return.
-
-## 7. Buffering, rendering and completion
-
-### Startup
-
-Use the existing four-second initial buffer. Begin motion when four seconds of contiguous footage are available, or when a shorter extract has completed and at least one frame is available.
-
-### Rebuffering
-
-When the next required frame is absent:
-
-- Hold the last displayed image.
-- Stop advancing playback position.
-- Show BUFFERING and continue polling.
-- Resume after a small contiguous buffer is available, initially one two-second chunk.
-
-Do not clear the picture repeatedly or restart FFmpeg for every gap.
-
-### Rendering
-
-Use the current canvas, scene area, ink colour, LCD background and nearest-neighbour scaling rules. Decode only the selected frame with the existing hex-msb interpretation. Preserve transparent background/backlight behaviour. Avoid rewriting the static renderer just to share a short bit-decoding loop.
-
-Memory should comprise the adapter's bounded chunk window, one currently presented frame and the existing canvas image buffer. Never accumulate all received frames into clip.frames.
-
-### Completion
-
-Use the configured duration initially, then the final frame count once reported. Detect EOF separately from a missing future chunk. At completion, present the final frame, stop clock/polling, release the session and show TRANSMISSION ENDED with Back. No autoplay-next.
-
-## 8. Live-only control contract
-
-| Control | Live behaviour |
+| Input | Live behaviour |
 | --- | --- |
-| Select / key 5 | Stop and return |
-| Back / physical back control | Stop and return to launch screen |
+| Select/key 5 | Stop and return |
+| Back | Stop and return to launch screen |
 | * | Stop, then Home |
-| # | Existing backlight behaviour |
-| 4 / 6 | No seek; announce unavailable in this checkpoint |
-| 0 | No quality change |
-| 2 | No caption toggle |
-| 7 | No ASCII/LCD switch |
-| Info / sharing | Do not invoke static clip-dependent behaviour |
+| # | Existing backlight |
+| 4/6 | Seek unavailable |
+| 0 | Quality change unavailable |
+| 2 | Caption toggle unavailable |
+| 7 | ASCII/LCD switch unavailable |
+| Info/sharing | Do not enter static clip-dependent handlers |
 
-The live footer must describe actual actions, such as STOP / BACK, instead of promising Pause. Verify the different handset layouts. If a model-specific footer policy overrides the label, use a narrow live-view exception rather than a global navigation redesign.
+Unsupported actions must be honestly labelled/announced rather than silently performing another action. Live footer actions such as STOP/BACK must match all handset models. Use narrow local exceptions if footer policies override them, not a global navigation redesign.
 
-Static items retain their existing controls and persisted renderer preference. A saved ASCII preference must not prevent this fixed LCD live source from displaying; returning to static playback must preserve the user's original preference.
+Static controls/preferences remain unchanged. A persisted ASCII preference must not prevent fixed LCD streaming; returning to static playback preserves that preference. Record an input-origin/action matrix for numeric keys, keyboard arrows, physical rockers and 7110 roller click/movement/wheel. Do not infer all actions from the final numeric digit.
 
-## 9. Cleanup and races
+## 9. Cleanup and terminal states
 
-### Back during startup
+- Back during startup leaves immediately; late responses must not reopen the live view.
+- Repeated Play uses bridge generations and the adapter lifecycle queue, not competing adapter instances.
+- Live -> static invalidates callbacks and resets timing/rendering before delegating the static load.
+- Static -> live invalidates the handset's numeric static-load token so an old download cannot restore the static player.
+- Failed acknowledged cleanup blocks silent replacement. Follow the prerequisite Start contract for unacknowledged work; the lease alone is not proof of latest-intent cancellation.
+- Live playback never writes static resume/completion records.
 
-Return the UI immediately. Let the adapter release any acknowledged navigation through its serialized lifecycle. A late Start response must not reopen the live screen.
+Distinguish known terminal causes where supported. Do not label every 404, stopped state or timeout SESSION EXPIRED. If the cause is ambiguous, use SESSION ENDED - RESTART. SESSION EXPIRED requires a verified reason; transport timeout and conversion failure are different errors. Keep Back usable and do not claim confirmed cleanup when the network request failed.
 
-### Repeated Play
+## 10. Deliverables and small passes
 
-Invalidate the old bridge generation and use the adapter lifecycle queue. Do not create independent adapter instances racing to own the backend.
+Target two new implementation files: tools/handset_live_preview.py and handset-live.js. Add focused host/routing, bridge state/timing and browser integration tests plus checkpoint notes. Final filenames/count are proposals, not files already created.
 
-### Live to static
+After prerequisite fixes pass:
 
-Stop the live source, invalidate its callbacks, reset timing/rendering state and delegate the static load to the existing loader. No late live frame may paint over static playback.
+1. 5A.3A: host/static/API composition only. Gate: existing static handset works; same origin, capability/CSP, safe routing and both gzip paths are correct; no premature live entry.
+2. 5A.3B: bridge in isolation. Gate: state transitions, held buffering, smooth clock versus presented-frame time, one animation chain/timer, stale callback rejection and static delegation.
+3. 5A.3C: enable the virtual entry and verify in a browser. Gate: first live picture before full conversion, Stop/Back/Home, hidden-page cleanup, EOF tails, source switching and model labels.
 
-### Static to live
+Save each pass. Do not reconstruct the earlier stack. Outside the separately approved prerequisite fixes, leave the adapter, conversion engine and M4 API unchanged unless a proven defect needs an isolated regression fix.
 
-Invalidate the handset's existing static-load token before starting the live source. An earlier static download must not restore the static player over the live view.
+## 11. Definition of done
 
-### Network or cleanup failure
+On the mini PC, open the local handset over LAN, select the live entry, observe buffering then motion, Stop to the correct page, start again without accumulating workers/timers, leave during startup without resurrection, complete short tails without permanent buffering, and play a static sample afterwards.
 
-Show an actionable error and keep Back usable. Do not silently create another session if acknowledged cleanup failed. Preserve the backend lease fallback for unacknowledged or unreachable work. Never claim confirmed immediate cleanup when the network request failed.
-
-Live playback must not write resume/completion records into the static progress store.
-
-## 10. Proposed implementation files
-
-Target two new implementation files:
-
-| File | Role |
-| --- | --- |
-| tools/handset_live_preview.py | Same-origin host, capability/configuration and virtual entry |
-| handset-live.js | Live-view bridge using the existing adapter |
-
-Supporting files cover host/routing tests, bridge timing/state tests, browser integration checks and installation/acceptance/rollback notes.
-
-Keep stream-source.js, the conversion engine and M4 API unchanged unless baseline validation finds a specific blocking defect. Fix any such defect separately instead of burying it in the integration. Final filenames and exact file count should be confirmed during implementation, not treated as already created.
-
-## 11. Three small implementation passes
-
-### 5A.3A: hosting only
-
-Implement the new host and HTTP tests. Gate: static handset playback still works; handset/API share an origin; capability/CSP and both gzip paths are correct; no live entry is exposed before its bridge is available.
-
-### 5A.3B: bridge in isolation
-
-Implement the bridge with controlled adapter responses. Gate: correct state transitions; buffering freezes time; exactly one animation chain and polling timer; Stop/source switching reject stale callbacks; static playback remains unaffected.
-
-### 5A.3C: connect and verify
-
-Enable the virtual entry and perform actual browser tests. Gate: selecting it shows converted frames inside the phone before the entire extract converts; Stop/Back/Home, hidden-page cleanup and EOF work; static playback works afterwards; handset labels/actions remain correct.
-
-Save each pass before starting the next. Do not reconstruct M1-M4 or turn this into one large rewrite.
-
-## 12. Definition of done
-
-On the mini PC:
-
-1. Open the local handset over the LAN.
-2. Select Local stream test.
-3. Observe startup/buffering followed by moving LCD footage inside the phone.
-4. Stop and return to the correct screen.
-5. Start again without accumulating workers or timers.
-6. Leave during startup without a late response reopening playback.
-7. Reach EOF without permanent buffering.
-8. Play an existing static sample afterwards.
-
-Automated state tests do not replace the browser check. If headless browser tooling is unavailable, explicitly mark visual verification pending until manually checked. No implementation, browser result or deployment is claimed by committing this plan.
+Mock/state tests are not a real-browser result. If headless tooling is unavailable, visual acceptance remains pending until manually checked. No code fix, implementation, deployment or host result is claimed by this documentation revision.
 
 ## Browser references
 
-- Same-origin policy: https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy
-- requestAnimationFrame and hidden tabs: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
+- https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy
+- https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame
