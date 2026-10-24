@@ -123,8 +123,8 @@ class StreamBridge {
       fetchImpl: window.fetch.bind(window),
     });
     this._generation = 0;
-    this._state = 'idle';           // idle|starting|buffering|playing|ended|error|stopping
-    this._paused = false;
+    this._state = 'idle';           // idle|starting|buffering|playing|paused|ended|error|stopping
+    this._resumeState = 'buffering'; // state to restore when leaving 'paused'
     this._relPosition = 0;
     this._sourceStart = 0;
     this._totalDuration = null;
@@ -134,12 +134,31 @@ class StreamBridge {
     this._pollTimer = null;
     this._metadata = null;
   }
-  get active() { return ['starting', 'buffering', 'playing'].includes(this._state); }
+  get active() { return ['starting', 'buffering', 'playing', 'paused'].includes(this._state); }
   isLivePlaying() { return this._state === 'playing'; }
   get framed() { return this._presentedFrame !== null; }
 
   _validateEntry(entry) {
     return entry && typeof entry.id === 'string' && entry.id === LIVE_ENTRY_ID;
+  }
+
+  async pause() {
+    if (!this.active) return;
+    if (this._state === 'paused') return;
+    this._resumeState = this._state; // buffering | playing
+    this._state = 'paused';
+    this._generation++;
+    this._announce('PAUSED');
+    this._renderFooter(performance.now());
+  }
+
+  async resume() {
+    if (this._state !== 'paused') return;
+    this._generation++;
+    this._state = this._resumeState || 'playing';
+    this._scheduleRaf();
+    this._renderFooter(performance.now());
+    this._announce('PLAYING');
   }
 
   async play(entry) {
@@ -202,28 +221,16 @@ class StreamBridge {
       if (cancelled) return;
       if (!this.active) return;
       try {
-        const ft = this.adapter.frameAt(this._sourceStart + this._relPosition);
-        if (ft === null) {
-          // Underflow: hold last position, keep polling. No rewind past start.
-          const bufferedEnd = this.adapter.bufferedUntil(this._sourceStart + this._relPosition);
-          if (bufferedEnd > this._sourceStart) {
-            this._relPosition = bufferedEnd - this._sourceStart;
-          }
-          this._scheduleRaf();
-          return;
-        }
         const status = await this.adapter.poll({
           sourceTime: this._sourceStart + this._relPosition,
-          paused: this._paused && this._state === 'playing',
+          paused: this._state === 'paused',
         });
-        if (!status || this._generation !== this.adapter._generation) {
-          if (this._generation !== this.adapter._generation) return;
-        }
-        if (status && ['complete', 'error', 'stopped'].includes(status.state)) {
-          this._handleTerminal(status);
-          return;
-        }
+        const g = this._generation;
+        if (!status) { this._scheduleRaf(); return; }
+        if (g !== this._generation) return;
+        if (['complete','error','stopped'].includes(status.state)) { this._handleTerminal(status); return; }
         this._checkTailThroughEOF(status);
+        if (this._state === 'buffering') this._state = 'playing';
         this._scheduleRaf();
       } catch (err) {
         if (this._generation === this.adapter._generation) {
@@ -272,7 +279,8 @@ class StreamBridge {
     this._scheduleRaf();
   }
   _advance(now) {
-    if (!this._paused && this._state === 'playing') {
+    // The clock only runs while playing. Paused and buffering hold the position.
+    if (this._state === 'playing') {
       if (this._clockStart === 0) this._clockStart = now;
       this._relPosition += (now - this._clockStart) / 1000;
       if (this._totalDuration != null) {
@@ -280,10 +288,20 @@ class StreamBridge {
       }
     }
     this._clockStart = now;
-    this._presentedFrame = this.adapter.frameAt(this._sourceStart + this._relPosition);
-    if (this._presentedFrame) {
-      drawScene(this._presentedFrame.hex, this._presentedFrame.cols, this._presentedFrame.rows);
+    const frame = this.adapter.frameAt(this._sourceStart + this._relPosition);
+    if (frame) {
+      this._presentedFrame = frame;
+      drawScene(frame.hex, frame.cols, frame.rows);
       this._drawInfoBar(now);
+    } else {
+      // Underflow: hold the last presented picture, keep the relative position.
+      // Never rewind past the start and never advance past available data.
+      const bufferedEnd = this.adapter.bufferedUntil(this._sourceStart + this._relPosition);
+      if (bufferedEnd != null && bufferedEnd > this._sourceStart) {
+        const maxRel = bufferedEnd - this._sourceStart;
+        if (this._relPosition > maxRel) this._relPosition = maxRel;
+      }
+      this._state = this._state === 'playing' ? 'buffering' : this._state;
     }
     this._renderFooter(now);
   }
@@ -295,7 +313,8 @@ class StreamBridge {
   }
   _renderFooter(now) {
     let left = 'PLAY', right = 'BACK';
-    if (this._state === 'playing') { left = this._paused ? 'PAUSE' : 'STOP'; right = 'BACK'; }
+    if (this._state === 'playing') { left = 'STOP'; right = 'BACK'; }
+    else if (this._state === 'paused') { left = 'PAUSE'; right = 'BACK'; }
     else if (this._state === 'buffering') { left = 'BUFFERING'; right = 'BACK'; }
     else if (this._state === 'ending' || this._state === 'ended') { left = 'ENDED'; right = 'BACK'; }
     else if (this._state === 'error') { left = 'ERROR'; right = 'BACK'; }
@@ -409,7 +428,17 @@ window.back = function () {
 
 window.key = function (value) {
   const b = ensureBridge();
-  if (b && b.active && (b.isLivePlaying() || b._state === 'buffering')) {
+  if (b && b.active && (b.isLivePlaying() || b._state === 'buffering' || b._state === 'paused')) {
+    if (value === '5') {
+      if (b._state === 'paused') {
+        // Currently paused → resume
+        b.resume().then(() => {});
+      } else {
+        // Currently playing or buffering → pause
+        b.pause().then(() => {});
+      }
+      return;
+    }
     handleLiveKey(value);
     return;
   }

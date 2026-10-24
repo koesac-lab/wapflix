@@ -471,6 +471,33 @@ test('the bridge is inert without a capability token', () => {
   assert.equal(env.calls.load, 1, 'without a capability the static path is used unchanged');
 });
 
+test('press 5 during playing pauses; press 5 again resumes', () => {
+  const env = buildEnv();
+  env.ctx.load({ id: 'local-stream-test' }, false, {});
+  return new Promise(resolve => setImmediate(() => {
+    env.runRaf(1000);
+    env.runTimers();   // poll tick fires → state = playing
+    setImmediate(() => { // drain the async poll microtask
+      env.runRaf(2000);  // now framed=true, footer shows STOP
+      const before = env.elements.get('left').getAttribute('aria-label');
+      assert.ok(before === 'STOP', `expected STOP before pause, got: ${before}`);
+      // First 5 press: pause (from playing → paused)
+      env.ctx.key('5');
+      setImmediate(() => {
+        const left = env.elements.get('left').getAttribute('aria-label');
+        assert.ok(left === 'PAUSE', `expected PAUSE after pause, got: ${left}`);
+        // Second 5 press: resume (from paused → playing)
+        env.ctx.key('5');
+        setImmediate(() => {
+          const left = env.elements.get('left').getAttribute('aria-label');
+          assert.ok(left === 'STOP', `expected STOP after resume, got: ${left}`);
+          resolve();
+        });
+      });
+    });
+  }));
+});
+
 (async () => {
   let failed = 0;
   for (const { name, fn } of tests) {
