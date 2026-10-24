@@ -1,57 +1,62 @@
 # WAPFLIX — cinema, reduced
 
-An LCD and ASCII cinema artwork for an alternative 1999. Static, dependency-free browser player; three original silent procedural studies; compressed frame assets; offline video conversion.
+A retro-handset LCD/ASCII cinema project, with an independent public static demo and a private on-demand conversion application under development. A modern browser is required; this is not an application for original WAP hardware.
 
-## Dithered LCD playback
+## Development: start here
 
-The published handset demo now defaults to one-bit dithered pixels. Press 7 during playback to switch to ASCII. Existing ASCII-only clips remain supported. See LCD_VIDEO.md for conversion commands, format and tests. The progressive-test server remains ASCII-only; catalogue posters and social previews are unchanged.
+Read [docs/START_HERE.md](docs/START_HERE.md) for current verified status, document precedence and the next bounded task. Read [ROADMAP.md](ROADMAP.md) for product direction, not implementation completion.
 
-## GitHub Pages
+Current next work is R2B.1 under [the R2B backend contract](docs/plans/R2B_BACKEND_CONTRACT.md). R1 and the isolated R2A core are committed; full Start fencing is not wired into the backend/adapter. The existing handset-live host is an unaccepted integration scaffold, not proof of real conversion. The corrected [5A.3 checkpoint](CHECKPOINT_5A3.md) explains the limitations.
 
-The included workflow generates the demo assets and deploys on pushes to main. It attempts to enable Pages automatically. If repository policy prevents this, choose Settings → Pages → Source: GitHub Actions, then rerun Publish WAPFLIX. A successful deployment is required before the site is live.
+Do not use older milestone prose or reported mock-test counts as evidence that later work is finished. Keep implementation patches small and stage intended files explicitly rather than archives/backups/output with git add .
 
-## Local preview
+## Public demo
 
-Python 3.9+ is required; demo generation needs no third-party packages.
+The GitHub Pages workflow builds and deploys the static experience from main. It must remain independent of local APIs, credentials and personal library data. Successful deployment and browser verification are separate from a successful commit. See [LCD_VIDEO.md](LCD_VIDEO.md) and [SAMPLE_GENERATION.md](SAMPLE_GENERATION.md).
+
+## Local static handset preview
+
+With the existing converted assets in place:
+
+```sh
+python3 tools/handset_static_preview.py --bind 0.0.0.0 --port 8102
+```
+
+Open http://YOUR_MINI_PC_LAN_IP:8102/. This is static playback only and does not rebuild video or connect to the streaming API. See [HANDSET_5A1.md](HANDSET_5A1.md). Keep development servers on a trusted network, not publicly port-forwarded.
+
+The original root-only preview remains a simpler legacy path:
 
 ```sh
 python3 tools/build.py
 python3 -m http.server 8000
 ```
 
-This root preview uses the base ASCII interface. The enhanced handset and LCD variants require the complete build sequence in .github/workflows/pages.yml.
+Do not open index.html as a file. This root-only path does not assemble all enhanced handset modules.
 
-Open http://localhost:8000. Do not open index.html directly as a file. For branch-based Pages hosting, generate and commit assets first, then choose main / root instead of the workflow.
+## Conversion and diagnostic tools
 
-## Convert your footage
+- [SAMPLE_GENERATION.md](SAMPLE_GENERATION.md): current fine-LCD presets and repeatable snippet/full generation using tools/regenerate_samples.py.
+- [LCD_VIDEO.md](LCD_VIDEO.md): legacy LCD converter and format; its old presets are not the current fine-profile defaults.
+- [LOCAL_STREAMING_M2.md](LOCAL_STREAMING_M2.md), [M2_LAN_ACCESS.md](M2_LAN_ACCESS.md), [LOCAL_STREAMING_M3.md](LOCAL_STREAMING_M3.md): local LCD diagnostic server/caption checkpoints.
+- [LOCAL_STREAMING_M4A.md](LOCAL_STREAMING_M4A.md), [LOCAL_STREAMING_M4B.md](LOCAL_STREAMING_M4B.md): diagnostic seek API/viewer, not the full handset integration.
+- [HANDSET_5A2.md](HANDSET_5A2.md): standalone browser transport adapter.
 
-Install FFmpeg, including ffprobe. From the repository root:
+Install FFmpeg/ffprobe for video conversion. Source media and full SRT files belong outside the public assets/repository. Converted frames and caption text are also redistributable media content: publish only what you may redistribute. Reserve drive, orbit and rain for procedural demo IDs.
 
-```sh
-python3 tools/build.py input.mp4 --id night-walk --title "Night walk" --start 35 --seconds 15 --description "One street. A little less detail."
-python3 tools/lcd_video.py --output . --video input.mp4 --id night-walk --start 35 --seconds 15
-```
+## Playback limitations and compression
 
-Commit the generated assets directory. The workflow retains custom clips and regenerates the demos. Reserve IDs drive, orbit and rain for demos. Source videos are not published automatically; use footage you have permission to redistribute.
+Public/static clips download in full before playback. The real local diagnostic pipeline delivers progressive chunks. The handset integration remains gated and must not be confused with either. Clips are silent; modem labels are fictional and do not throttle bandwidth. Neither ASCII nor one-bit frames are automatically more efficient than modern video codecs.
 
-ASCII pipeline: video → FFmpeg grayscale frames → brightness-to-ASCII mapping → compact JSON → gzip → static hosting → browser decompression → text playback. Qualities are 48 columns/4 fps, 72/6 and 96/8. Character cells are assumed twice as tall as wide; display aspect ratio is preserved approximately.
+Static .gz assets deliberately have no Content-Encoding because the static loader decompresses explicitly; plain JSON is its fallback. API gzip chunks use ordinary HTTP Content-Encoding. Do not interchange the two behaviours. Automated syntax/state tests do not replace browser/host validation.
 
-LCD pipeline: decoded greyscale frames → ordered dithering → packed one-bit frames → hex JSON → gzip → bitmap playback. Qualities are 60 pixels/4 fps, 80/6 and 120/8. Use identical source intervals for both commands; LCD conversion inherits the ASCII subtitles.
+## Plans and history
 
-Optional --subtitles subtitles.json on tools/build.py accepts a JSON array like [{"start":2,"end":6,"text":"We waited for the signal."}], timed relative to the extracted clip.
+Active status and task: [docs/START_HERE.md](docs/START_HERE.md). Detailed phase requirements and historical records are indexed there. Existing runtime, archives, backups and media are not removed by this documentation cleanup.
 
-## Honest limitations
+Research references only; no code/assets from these are bundled:
 
-This is buffered clip playback, not progressive streaming: each clip downloads before playing. Quality selection downloads a genuinely different asset; modem labels are fictional and do not throttle network speed. Clips are silent. The base player does not auto-start; the enhanced handset can start a selected transmission and autoplay the next item. A modern browser is required; this is not a WML application for old WAP phones.
+- https://github.com/brainphreak/html5-ascii-video-player
+- https://wonger.dev/posts/chafa-ffmpeg-progress
+- https://docs.asciinema.org/manual/asciicast/v2/
 
-The included simple, repetitive 12-second ASCII demos are roughly 2.5–16 KiB compressed per variant; LCD variants have different sizes. Actual footage can be much larger. Neither ASCII nor dithered bitmaps are automatically more bandwidth-efficient than modern video. Displayed KiB is the downloaded clip asset size, not total page traffic. Browsers without DecompressionStream download the larger JSON fallback. Do not serve .gz assets with a Content-Encoding header: the player explicitly decompresses them.
-
-For long-form playback, use short independent chunks, buffered prefetching and measured delta encoding. The current prototype loads whole clips into memory. Syntax and conversion tests are not a substitute for visual browser testing.
-
-## Related work
-
-- https://github.com/brainphreak/html5-ascii-video-player — browser-side video-to-ASCII rendering, a different delivery model.
-- https://wonger.dev/posts/chafa-ffmpeg-progress — FFmpeg decoding combined with Chafa symbol rendering.
-- https://docs.asciinema.org/manual/asciicast/v2/ — timed terminal-output format.
-
-Research references only; no code or assets from these projects are bundled. Code and original generated demo clips are MIT licensed.
+Code and original generated demo clips are MIT licensed.
