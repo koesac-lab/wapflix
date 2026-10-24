@@ -1,4 +1,4 @@
-/* 5A.2: standalone transport adapter. No DOM, rendering, background polling or auto-start. */
+/* R2C: fenced standalone transport adapter. No DOM, rendering, background polling or auto-start. */
 (function(root){
 'use strict';
 class WapflixStreamSource {
@@ -13,6 +13,7 @@ class WapflixStreamSource {
   this._timeoutMs=timeoutMs;this._token=token;this._origin=base.origin;this._generation=0;this._queue=Promise.resolve();
   this._owned=null;this._metadata=null;this._status=null;this._pending=null;this._chunks=new Map();
   this._state='idle';this._error=null;
+  this._control=null;this._revision=0;this._intent=null;this._opening=null;
   this._warmed=false; // Latched for this stream generation, independent of cache eviction.
  }
  get state(){return this._state;}
@@ -45,20 +46,58 @@ class WapflixStreamSource {
   const operation=(async()=>{
    const response=await this._fetch(new URL(path,this._origin).href,options);
    if(!response.ok){
-    let message=`HTTP ${response.status}`;
-    try{message=(await response.json()).error||message;}catch{}
-    const error=Error(message);error.status=response.status;throw error;
+    let message=`HTTP ${response.status}`,code;
+    try{const data=await response.json();if(typeof data?.error==='string')message=data.error;if(typeof data?.code==='string')code=data.code;}catch{}
+    const error=Error(message);error.status=response.status;error.code=code;throw error;
    }
    return response.status===204?null:await response.json();
   })();
   try{return await Promise.race([operation,deadline,cancelled]);}
   finally{clearTimeout(timer);signal?.removeEventListener('abort',onAbort);}
  }
+ async _openControl(g){
+  if(this._control)return this._control;
+  const opening={controller:new AbortController()};this._opening=opening;
+  try{
+   const data=await this._api('/api/control/open',{},opening.controller.signal);
+   if(g!==this._generation)return null;
+   if(data?.control_protocol!=='start-fence-v1'||typeof data.control_client_id!=='string'||!/^([0-9a-f]{48})$/.test(data.control_client_id)||data.control_lease_seconds!==60)throw Error('Unsupported Start fencing protocol');
+   this._control=Object.freeze({id:data.control_client_id});return this._control;
+  }finally{if(this._opening===opening)this._opening=null;}
+ }
+ _sendCancel(intent){
+  if(intent.fenced)return Promise.resolve();
+  if(intent.cancelPromise)return intent.cancelPromise;
+  const operation=(async()=>{
+   try{
+    const data=await this._api('/api/control/cancel',{control_client_id:intent.control.id,cancel_through:intent.revision});
+    if(data?.fence_recorded!==true||!['not_required','confirmed'].includes(data.cleanup))throw Error('Unconfirmed Start fence cleanup');
+   }catch(error){
+    // Only this structured code proves a disappeared non-owner; a generic 404
+    // could mean unsupported routing and must never weaken the fence contract.
+    if(error.status!==404||error.code!=='control_client_gone')throw error;
+    if(this._control===intent.control)this._control=null;
+   }
+   intent.fenced=true;
+  })();
+  intent.cancelPromise=operation;
+  const clear=()=>{if(intent.cancelPromise===operation)intent.cancelPromise=null;};
+  operation.then(clear,clear);return operation;
+ }
+ _cancelCurrent(){
+  this._opening?.controller.abort();
+  const intent=this._intent;if(!intent)return;
+  intent.cancelled=true;
+  // Start the scoped server fence BEFORE aborting the client request. This
+  // bypasses the lifecycle queue and does not rely on fetch-abort delivery.
+  this._sendCancel(intent).catch(()=>{});
+  intent.controller.abort();
+ }
  async _releaseOwned(){
-  const owned=this._owned;if(!owned)return;
-  try{await this._api('/api/navigation/stop',{navigation_id:owned.navigation_id});}
-  catch(error){if(error.status!==404&&error.status!==410)throw error;}
-  if(this._owned===owned)this._owned=null;
+  const intent=this._intent;if(!intent)return;
+  intent.cancelled=true;const cleanup=this._sendCancel(intent);intent.controller.abort();
+  await cleanup;
+  if(this._intent===intent){this._intent=null;this._owned=null;}
  }
  _validateMetadata(data){
   const int=n=>Number.isInteger(n)&&n>0;
@@ -70,26 +109,32 @@ class WapflixStreamSource {
   return Object.freeze({...data});
  }
  start(){
-  const g=this._invalidate('starting');
+  const g=this._invalidate('starting');this._cancelCurrent();
   return this._enqueue(async()=>{
-   let newOwner=false;
    try{
     await this._releaseOwned();if(g!==this._generation)return null;
-    // Start is intentionally not aborted: its acknowledged navigation can be
-    // released even if Stop/new Start happened while the request was pending.
-    const data=await this._api('/api/start',{});
-    if(typeof data?.navigation_id==='string'&&data.navigation_id){this._owned={navigation_id:data.navigation_id};newOwner=true;}
-    if(g!==this._generation){newOwner=false;await this._releaseOwned();return null;}
-    this._metadata=this._validateMetadata(data);this._state='ready';return this._metadata;
+    const control=await this._openControl(g);if(!control||g!==this._generation)return null;
+    if(this._revision>=Number.MAX_SAFE_INTEGER)throw Error('Start revision exhausted; create a new source');
+    const intent={control,revision:++this._revision,controller:new AbortController(),cancelled:false,fenced:false,cancelPromise:null};
+    this._intent=intent;
+    const data=await this._api('/api/start',{control_client_id:control.id,start_revision:intent.revision},intent.controller.signal);
+    if(g!==this._generation)return null;
+    if(data?.control_protocol!=='start-fence-v1'||data.control_client_id!==control.id||data.start_revision!==intent.revision)throw Error('Invalid fenced Start identity');
+    const metadata=this._validateMetadata(data);
+    this._owned={navigation_id:metadata.navigation_id};this._metadata=metadata;this._state='ready';return metadata;
    }catch(error){
-    if(newOwner){try{await this._releaseOwned();}catch(cleanup){error.cleanupError=cleanup;}}
+    if(g!==this._generation)return null;
+    // A rejected current registration is retired for the NEXT explicit user
+    // Start only. Never silently renew/retry after a stale reply or a takeover.
+    if(['control_client_gone','client_superseded','client_expired'].includes(error.code))this._control=null;
+    try{await this._releaseOwned();}catch(cleanup){error.cleanupError=cleanup;}
     if(g!==this._generation)return null;
     this._state='error';this._error=error;throw error;
    }
   });
  }
  stop(){
-  const g=this._invalidate('stopping');
+  const g=this._invalidate('stopping');this._cancelCurrent();
   return this._enqueue(async()=>{
    try{await this._releaseOwned();if(g===this._generation)this._state='stopped';return true;}
    catch(error){if(g===this._generation){this._state='error';this._error=error;}throw error;}
@@ -145,6 +190,7 @@ class WapflixStreamSource {
     return this._status;
    }catch(error){
     if(!this._current(g,m.id))return null;
+    if(['control_client_gone','client_superseded','client_expired'].includes(error.code)&&this._control===this._intent?.control)this._control=null;
     this._state='error';this._error=error;throw error;
    }finally{if(this._pending===ticket)this._pending=null;}
   })();
