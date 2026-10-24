@@ -71,6 +71,84 @@ test('paused startup prefills, then parks on subsequent pulse',async()=>{
  assert.equal(h.requests.filter(r=>r.path==='/api/pulse').at(-1).body.paused,false);
  await h.source.poll({sourceTime:30,paused:true});assert.equal(h.requests.filter(r=>r.path==='/api/pulse').at(-1).body.paused,true);await h.source.stop();
 });
+// 5A.2R1: startup readiness belongs to a generation, not retained chunk zero.
+test('pause remains honoured after initial chunks are evicted',async()=>{
+ const h=harness();
+ try{
+  await h.source.start();await h.source.poll();await h.source.poll({sourceTime:34});
+  assert.equal(h.source.frameAt(30),null,'chunk zero must actually be evicted');
+  assert.equal(h.source.retainedChunks,5);
+  await h.source.poll({sourceTime:34,paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse').at(-1).body.paused,true);
+ }finally{await h.source.stop();}
+});
+test('readiness survives repeated rolling-window eviction without retaining old frames',async()=>{
+ const h=harness();
+ try{
+  await h.source.start();await h.source.poll();
+  for(const sourceTime of [34,36,38,40]){
+   await h.source.poll({sourceTime});await h.source.poll({sourceTime,paused:true});
+   assert.equal(h.requests.filter(r=>r.path==='/api/pulse').at(-1).body.paused,true);
+   assert(h.source.retainedChunks<=5);assert.equal(h.source.frameAt(30),null);
+  }
+ }finally{await h.source.stop();}
+});
+test('Stop and Start reset readiness and preserve paused-start prefill',async()=>{
+ const h=harness();
+ try{
+  await h.source.start();await h.source.poll();await h.source.stop();
+  const next=await h.source.start();await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,false);
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,true);
+ }finally{await h.source.stop();}
+});
+test('replacement Start resets readiness without requiring an explicit Stop',async()=>{
+ const h=harness();
+ try{
+  await h.source.start();await h.source.poll();await h.source.poll({sourceTime:34});
+  const next=await h.source.start();assert(h.sessions.get('s1').stopped);
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,false);
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,true);
+ }finally{await h.source.stop();}
+});
+test('a completed one-frame clip becomes ready without a second chunk',async()=>{
+ const h=harness({duration:.125,complete:true});
+ try{
+  await h.source.start();await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse').at(-1).body.paused,false);
+  assert.equal(h.source.retainedChunks,1);assert.equal(h.source.frameAt(30.125).frameIndex,0);
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse').at(-1).body.paused,true);
+ }finally{await h.source.stop();}
+});
+test('a late chunk from an old generation cannot warm a replacement',async()=>{
+ const h=harness();
+ try{
+  await h.source.start();h.config.holdChunks=true;
+  const pending=h.source.poll({paused:true});await settle();assert.equal(h.pendingChunks.length,1);
+  const next=await h.source.start();h.config.holdChunks=false;
+  h.pendingChunks.shift()();assert.equal(await pending,null);await settle();
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,false);
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,true);
+ }finally{await h.source.stop();}
+});
+test('a late status from a warmed generation cannot warm a replacement',async()=>{
+ const h=harness();
+ try{
+  await h.source.start();await h.source.poll();h.config.holdPulses=true;
+  const pending=h.source.poll({paused:true});assert.equal(h.pendingPulses.length,1);
+  const next=await h.source.start();h.config.holdPulses=false;
+  h.pendingPulses.shift()();assert.equal(await pending,null);await settle();
+  await h.source.poll({paused:true});
+  assert.equal(h.requests.filter(r=>r.path==='/api/pulse'&&r.body.id===next.id).at(-1).body.paused,false);
+ }finally{await h.source.stop();}
+});
+
 test('concurrent polls coalesce rather than duplicating downloads',async()=>{
  const h=harness();await h.source.start();h.config.holdPulses=true;
  const a=h.source.poll(),b=h.source.poll();assert.equal(a,b);assert.equal(h.pendingPulses.length,1);

@@ -13,6 +13,7 @@ class WapflixStreamSource {
   this._timeoutMs=timeoutMs;this._token=token;this._origin=base.origin;this._generation=0;this._queue=Promise.resolve();
   this._owned=null;this._metadata=null;this._status=null;this._pending=null;this._chunks=new Map();
   this._state='idle';this._error=null;
+  this._warmed=false; // Latched for this stream generation, independent of cache eviction.
  }
  get state(){return this._state;}
  get error(){return this._error;}
@@ -22,6 +23,7 @@ class WapflixStreamSource {
  _invalidate(state){
   ++this._generation;if(this._pending)this._pending.controller.abort();this._pending=null;
   this._metadata=null;this._status=null;this._chunks.clear();this._state=state;this._error=null;
+  this._warmed=false;
   return this._generation;
  }
  _enqueue(action){
@@ -125,8 +127,7 @@ class WapflixStreamSource {
   this._pending=ticket;
   ticket.promise=(async()=>{
    try{
-    const warm=this._chunks.has(0)&&(this._chunks.has(1)||this._status?.state==='complete');
-    const data=await this._api('/api/pulse',{id:m.id,frame,paused:paused&&warm},ticket.controller.signal);
+    const data=await this._api('/api/pulse',{id:m.id,frame,paused:paused&&this._warmed},ticket.controller.signal);
     if(!this._current(g,m.id))return null;
     if(['error','stopped'].includes(data?.state))throw Error(data.error||'Session stopped or expired');
     this._validateStatus(data,m);this._status=Object.freeze({...data});
@@ -139,6 +140,8 @@ class WapflixStreamSource {
      if(!this._current(g,m.id))return null;
      if(chunk!==null)this._chunks.set(n,this._validateChunk(chunk,n,m));
     }
+    // Only validated, current-generation data may establish startup readiness.
+    if(this._chunks.has(0)&&(this._chunks.has(1)||data.state==='complete'))this._warmed=true;
     return this._status;
    }catch(error){
     if(!this._current(g,m.id))return null;
