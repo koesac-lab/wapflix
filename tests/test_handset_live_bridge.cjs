@@ -148,7 +148,7 @@ for(const event of ['visibilitychange','pagehide'])test(event+' applies the curr
   }else{assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);}
 });
 test('unsupported numeric actions never reach static handlers; backlight still delegates',async()=>{
-  const e=environment();await e.play();for(const k of ['0','1','3','4','6','7','8','9']){e.ctx.key(k);assert.match(e.elements.get('summary').textContent,/unavailable/);}assert.deepEqual(e.calls.key,[]);e.ctx.key('#');assert.deepEqual(e.calls.key,['#']);assert.equal(e.snapshot().state,'playing');
+  const e=environment();await e.play();for(const k of ['0','1','3','7','8','9']){e.ctx.key(k);assert.match(e.elements.get('summary').textContent,/unavailable/);}assert.deepEqual(e.calls.key,[]);e.ctx.key('#');assert.deepEqual(e.calls.key,['#']);assert.equal(e.snapshot().state,'playing');
 });
 test('physical rocker/roller movement, wheel and keyboard arrows are navigation origins',async()=>{
   const e=environment();await e.play();for(const type of ['click','wheel']){const target={closest:selector=>selector==='.roller-press'?null:({classList:{contains:()=>false}})};const event=e.event(type,target);assert.equal(event.stopped,true);assert.match(e.elements.get('summary').textContent,/Navigation/);}const arrow=e.event('keydown',{}, {key:'ArrowUp'});assert.equal(arrow.stopped,true);assert.deepEqual(e.calls.key,[]);

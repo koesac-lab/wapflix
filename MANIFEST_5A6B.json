@@ -1,0 +1,49 @@
+{
+  "patch": "5A.6B",
+  "baseline_commit": "d2b2cd0040782335821e26f7c46748df5b739e65",
+  "dependencies": {
+    "live-captions.js": "9ad48646ed6bc79e4fa4fcba85645de355c568c4",
+    "handset-captions.js": "0a5c30ddf8f881e01fee9a34bfad40583a36b0f9",
+    "tools/lcd_stream_fenced_api.py": "1e3341ca0841d65bad4f72bb11ed46d85a594a00"
+  },
+  "files": {
+    "handset-live.js": {
+      "before_blob": "dc96cee49426ae5f5e778a1d465294d4d12f73e3",
+      "sha256": "8dfd56c6c78d07a0303bbb44965e1ef4ef31cf5bda0f685b820fe08de6183cd1"
+    },
+    "stream-source.js": {
+      "before_blob": "c49438246272cdf38debe352107beb7756d1df77",
+      "sha256": "e424bc574a1bf687cbdf01e26daae2e0d840dcf507794093d4607c94dc5b87f7"
+    },
+    "tests/test_handset_live_bridge.cjs": {
+      "before_blob": "389c5ce47ee93903e8d8d6ee7d9972d84b036905",
+      "sha256": "69f2776f7703f23687020c7de9616b622ee06f5c26005e3d3195eed70f5a45dd"
+    },
+    "tests/helpers/fenced_seek_harness.cjs": {
+      "before_blob": null,
+      "sha256": "9bf63ff7b5d74118c587685d5329a32354c81e060e7feb87df06383eaf20adff"
+    },
+    "tests/test_stream_source_seek.cjs": {
+      "before_blob": "06f6a83377b85be16dc22e008c088c1338c543bb",
+      "sha256": "7483730c5c6d182d890057c98b9ad8442ef6ebbab8e005055baeb2c977dedcd3"
+    },
+    "tests/test_handset_live_seek.cjs": {
+      "before_blob": null,
+      "sha256": "0fd4f7d28215d939a21f94543ea658dd660c3c6391dc547bac48261b6b23b214"
+    },
+    "tools/apply_handset_5a6b.py": {
+      "before_blob": null,
+      "sha256": "552a3d409bc29e9812ec04619e9a740132f2209d4d2c42d02204c995e6b6b792"
+    },
+    "CHECKPOINT_5A6B_HANDSET_SEEK.md": {
+      "before_blob": null,
+      "sha256": "f41d2cfa0e4c87500902908403cd07e73eebf3feb3b68d0c535968df597cc3b6"
+    }
+  },
+  "validation": {
+    "controlled_node_cases": 78,
+    "passed": 78,
+    "full_repository_suite_run": false,
+    "real_http_ffmpeg_browser_acceptance_run": false
+  }
+}

@@ -18,30 +18,35 @@ class WapflixStreamSource {
  }
 
  seek(sourceTime){
-  // 5A.6A: an explicit seek is a replacement Start at a quantised source time.
-  const m=this._metadata;
-  if(!m||this._state!=='ready')return Promise.reject(Error('Seek requires an active stream'));
+  // 5A.6B prerequisite repair: use the fenced server's position-based restart.
+  const m=this._metadata,intent=this._intent;
+  if(!m||this._state!=='ready'||!intent||!this._owned)return Promise.reject(Error('Seek requires an active stream'));
   if(typeof sourceTime!=='number'||!Number.isFinite(sourceTime))return Promise.reject(TypeError('A finite source time is required'));
-  const requested=Math.min(Math.max(sourceTime,m.range_start),m.range_end);
-  const frame=Math.max(0,Math.floor((requested-m.source_start)*m.fps+1e-7));
-  const destination=m.source_start+frame/m.fps;
-  const g=this._invalidate('starting');this._cancelCurrent();
+  const revision=(m.revision??0)+1;
+  if(!Number.isSafeInteger(revision)||revision<1)return Promise.reject(Error('Seek revision exhausted; restart explicitly'));
+  const last=Math.max(0,Math.ceil((m.range_end-m.range_start)*m.fps-1e-7)-1);
+  const requested=Math.min(Math.max(sourceTime,m.range_start),m.range_start+last/m.fps);
+  // Only the server snaps: pre-snapping can round down twice for fractional starts.
+  const g=this._invalidate('seeking');
   return this._enqueue(async()=>{
+   if(g!==this._generation)return null;
    try{
-    await this._releaseOwned();if(g!==this._generation)return null;
-    const control=await this._openControl(g);if(!control||g!==this._generation)return null;
-    if(this._revision>=Number.MAX_SAFE_INTEGER)throw Error('Start revision exhausted; create a new source');
-    const intent={control,revision:++this._revision,controller:new AbortController(),cancelled:false,fenced:false,cancelPromise:null};
-    this._intent=intent;
-    const data=await this._api('/api/start',{control_client_id:control.id,start_revision:intent.revision},intent.controller.signal);
+    const data=await this._api('/api/seek',{navigation_id:m.navigation_id,revision,position:requested},intent.controller.signal);
     if(g!==this._generation)return null;
-    if(data?.control_protocol!=='start-fence-v1'||data.control_client_id!==control.id||data.start_revision!==intent.revision)throw Error('Invalid fenced Start identity');
     const metadata=this._validateMetadata(data);
-    this._owned={navigation_id:metadata.navigation_id};this._metadata=metadata;this._state='ready';
-    return Object.freeze({requested:sourceTime,destination,frame,metadata});
+    if(metadata.navigation_id!==m.navigation_id||metadata.revision!==revision||
+       metadata.range_start!==m.range_start||metadata.range_end!==m.range_end||
+       metadata.fps!==m.fps||metadata.source_start>requested+1e-7||
+       requested-metadata.source_start>1/m.fps+1e-7||
+       Math.abs((metadata.source_start-m.range_start)*m.fps-Math.round((metadata.source_start-m.range_start)*m.fps))>1e-6)throw Error('Invalid fenced seek identity or destination');
+    this._metadata=metadata;this._state='ready';
+    return Object.freeze({requested:sourceTime,destination:metadata.source_start,
+      frame:Math.round((metadata.source_start-m.range_start)*m.fps),metadata});
    }catch(error){
     if(g!==this._generation)return null;
     if(['control_client_gone','client_superseded','client_expired'].includes(error.code))this._control=null;
+    // The original Start intent owns every seek replacement. Its cancellation
+    // tombstones pending publication; retain the obligation if cleanup fails.
     try{await this._releaseOwned();}catch(cleanup){error.cleanupError=cleanup;}
     if(g!==this._generation)return null;
     this._state='error';this._error=error;throw error;

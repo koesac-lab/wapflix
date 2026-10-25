@@ -1,4 +1,4 @@
-/* 5A.5B handset captions, retaining the 5A.4 lifecycle. Local fenced host only. */
+/* 5A.6B: serial latest-intent restart-seeking. Local fenced host only. */
 (() => {
 'use strict';
 const cfg = window.wapflixLiveConfig;
@@ -12,9 +12,11 @@ let generation = 0, state = 'idle', metadata = null, status = null;
 let position = 0, presented = null, clock = null, timer = null, pendingPoll = null;
 let duration = 0, launch = null, cleanup = null, cleanupError = null, errorText = '';
 let playIntent = true, warmed = false;
+let seeking = null, rangeStart = 0, rangeEnd = 0;
+const SEEK_SECONDS = 5;
 let visibilityEpoch = 0, visibilityPulseWanted = false, resumeNeedsCheck = false;
 const live = () => view === 'live-player';
-const active = () => ['starting', 'buffering', 'playing', 'paused'].includes(state);
+const active = () => ['starting', 'seeking', 'buffering', 'playing', 'paused'].includes(state);
 const current = g => g === generation && live();
 const sourceTime = () => metadata.source_start + position;
 const clearPoll = () => { if (timer !== null) clearInterval(timer); timer = null; };
@@ -46,7 +48,8 @@ function restoreControls() {
 }
 function syncControls() {
   for (const element of controlLabels.keys()) if (element.isConnected === false) controlLabels.delete(element);
-  const action = state === 'starting' ? 'Cancel live startup' : state === 'error' ? 'Restart live playback from configured beginning' :
+  const action = state === 'seeking' ? (playIntent ? 'Pause after seek' : 'Resume after seek') :
+    state === 'starting' ? 'Cancel live startup' : state === 'error' ? 'Restart live playback from configured beginning' :
     state === 'ended' ? 'Replay live playback from configured beginning' : state === 'paused' ?
     (resumeNeedsCheck && !document.hidden ? 'Check session before resuming' : 'Resume live playback') :
     ['playing', 'buffering'].includes(state) ? 'Pause live playback' : 'Return to launch screen';
@@ -54,9 +57,16 @@ function syncControls() {
   for (const element of queryAll('.handset-up,.handset-down,.roller-up,.roller-down,.nav [data-key="2"],.nav [data-key="8"],.nav [data-key="4"]')) {
     labelControl(element, 'Navigation unavailable during live playback', true);
   }
-  const unavailable = {'0':'Quality change', '1':'Info', '3':'Sharing', '4':'Seek', '6':'Seek', '7':'LCD/ASCII switch', '8':'Navigation', '9':'Control 9'};
+  const unavailable = {'0':'Quality change', '1':'Info', '3':'Sharing', '7':'LCD/ASCII switch', '8':'Navigation', '9':'Control 9'};
   for (const [digit, label] of Object.entries(unavailable)) {
     for (const element of queryAll('.keypad [data-key="' + digit + '"]')) labelControl(element, label + ' unavailable during live playback', true);
+  }
+  for (const [digit, label] of [['4','Seek backward 5 seconds'], ['6','Seek forward 5 seconds']]) {
+    for (const element of queryAll('.keypad [data-key="' + digit + '"]')) {
+      labelControl(element, metadata && active() ? label : 'Seek unavailable without active playback');
+      if (metadata && active()) element.removeAttribute?.('aria-disabled');
+      else element.setAttribute('aria-disabled','true');
+    }
   }
   for (const element of queryAll('.keypad [data-key="2"]')) {
     labelControl(element, captionUI.enabled ? 'Disable live captions' : 'Enable live captions');
@@ -73,7 +83,7 @@ function restoreFocus(target) {
 const inputMatrix = Object.freeze({
   select: 'Cancel startup; otherwise Pause/Resume; terminal explicit Restart/Replay',
   back: 'Stop and return to launch screen', home: 'Stop and return Home',
-  numeric2: 'Toggle live captions', numeric4and6: 'Seek unavailable',
+  numeric2: 'Toggle live captions', numeric4and6: 'Seek backward/forward 5 source seconds',
   rocker: 'Navigation unavailable', rollerMovement: 'Navigation unavailable',
   rollerPress: 'Select', wheel: 'Navigation unavailable', keyboardArrows: 'Navigation unavailable',
   backlight: 'Existing backlight action'
@@ -88,7 +98,7 @@ function release() {
   return operation;
 }
 function terminal(next, message) {
-  const g = generation; captionUI.clear();
+  const g = generation; seeking = null; captionUI.clear();
   resumeNeedsCheck = false; visibilityPulseWanted = false;
   state = next; errorText = message || ''; clock = null; clearPoll();
   render(); announce(message || 'TRANSMISSION ENDED');
@@ -112,7 +122,7 @@ function available() {
     (status?.state === 'complete' && end >= metadata.source_start + duration - 1e-7));
 }
 async function poll(g) {
-  if (!current(g) || !metadata || !active() || pendingPoll !== null) return;
+  if (!current(g) || seeking || !metadata || !active() || pendingPoll !== null) return;
   const ticket = {epoch: visibilityEpoch, visible: !document.hidden}; pendingPoll = ticket;
   visibilityPulseWanted = false;
   try {
@@ -148,7 +158,7 @@ async function poll(g) {
 }
 async function start(entry) {
   if (live() && active()) return;
-  captionUI.clear();
+  seeking = null; captionUI.clear();
   const g = ++generation;
   launch = live() && launch ? launch : {view: !['player', 'ended'].includes(view) ? view : 'details', item: entry, focus: document.activeElement, summary: $('summary').textContent};
   ++token; setPlaying(false); clip = null; message = ''; detail = false;
@@ -162,7 +172,9 @@ async function start(entry) {
     // start() itself enforces release/fencing. Never use private adapter methods.
     const meta = await adapter.start();
     if (!current(g) || state !== 'starting' || !meta) return;
-    metadata = meta; duration = meta.range_end - meta.source_start; captionUI.setTrack(meta.captions);
+    metadata = meta; duration = meta.range_end - meta.source_start;
+    rangeStart = meta.range_start ?? meta.source_start; rangeEnd = meta.range_end;
+    captionUI.setTrack(meta.captions);
     if (document.hidden) { playIntent = false; resumeNeedsCheck = true; }
     state = playIntent ? 'buffering' : 'paused'; render(); announce(playIntent ? 'BUFFERING' : 'PAUSED');
     timer = setInterval(() => { void poll(g); }, 250);
@@ -171,7 +183,7 @@ async function start(entry) {
 }
 function exit(home = false) {
   if (!live()) return cleanup || Promise.resolve();
-  captionUI.clear();
+  seeking = null; captionUI.clear();
   const g = ++generation; clearPoll(); pendingPoll = null; clock = null; state = 'stopping';
   ++token; setPlaying(false); clip = null; message = ''; detail = false; last = 0; frame = -1;
   const target = launch;
@@ -209,7 +221,7 @@ function drawPicture() {
 function drawFooter() {
   // Local exception to the static single-Navi SELECT policy; transparent LCD.
   ctx.fillStyle = ink; ctx.fillRect(0, 207, 240, 1);
-  const label = state === 'starting' ? 'STOP' : state === 'error' ? 'RESTART' : state === 'ended' ? 'REPLAY' :
+  const label = state === 'seeking' ? (playIntent ? 'PAUSE' : 'RESUME') : state === 'starting' ? 'STOP' : state === 'error' ? 'RESTART' : state === 'ended' ? 'REPLAY' :
     state === 'paused' ? (resumeNeedsCheck && !document.hidden ? 'CHECK' : 'RESUME') :
     ['playing', 'buffering'].includes(state) ? 'PAUSE' : 'BACK';
   text(label, 3, 214); text('BACK', 213, 214);
@@ -220,7 +232,8 @@ render = function() {
   if (!live()) return originals.render();
   ctx.clearRect(0, 0, 240, 224); drawPicture();
   captionUI.draw(presented,active());
-  if (state === 'starting') center('CONNECTING...', 90);
+  if (state === 'seeking') center('SEEKING...', 90);
+  else if (state === 'starting') center('CONNECTING...', 90);
   else if (state === 'buffering') {
     // Status outside the picture area preserves the held image exactly.
     if (!presented) center('BUFFERING', 90);
@@ -275,7 +288,52 @@ load = function(entry, keep = false, options = {}) {
     if (g === generation && !live()) announce('Stop cleanup failed. Static load cancelled; retry explicitly.');
   });
 };
+function seekBy(seconds) {
+  if (!metadata || !active() || state === 'starting') {
+    announce('Seek unavailable without active playback.'); return;
+  }
+  const fps = metadata.fps;
+  const lastFrame = rangeStart + Math.max(0, Math.ceil((rangeEnd-rangeStart)*fps-1e-7)-1)/fps;
+  const target = Math.min(lastFrame, Math.max(rangeStart, (seeking?.target ?? sourceTime()) + seconds));
+  const job = seeking || {target, generation};
+  job.target = target; job.generation = ++generation;
+  const launchJob = seeking === null; seeking = job;
+  clearPoll(); pendingPoll = null; clock = null; state = 'seeking';
+  presented = null; status = null; warmed = false; captionUI.clear();
+  if (document.hidden) { playIntent = false; resumeNeedsCheck = true; }
+  render(); announce('SEEKING');
+  if (launchJob) void runSeeks(job);
+}
+async function runSeeks(job) {
+  while (seeking === job && live()) {
+    const g = job.generation, target = job.target;
+    try {
+      // The adapter accepts one seek at a time; coalesce UI intent, never overlap.
+      const result = await adapter.seek(target);
+      if (seeking !== job || !live()) return;
+      if (!result) throw Error('Seek ended without replacement metadata');
+      if (g !== generation) continue;
+      metadata = result.metadata; duration = metadata.range_end - metadata.source_start;
+      position = 0; presented = null; clock = null; status = null; warmed = false;
+      captionUI.setTrack(metadata.captions); seeking = null;
+      if (document.hidden) { playIntent = false; resumeNeedsCheck = true; }
+      state = playIntent ? 'buffering' : 'paused';
+      render(); announce(playIntent ? 'BUFFERING' : 'PAUSED - PREFILLING');
+      timer = setInterval(() => { void poll(g); }, 250);
+      void poll(g); return;
+    } catch (error) {
+      // A superseded target cannot retry after transport ownership has failed.
+      if (seeking === job && live()) { seeking = null; fail(error); }
+      return;
+    }
+  }
+}
 function togglePause() {
+  if (seeking) {
+    if (document.hidden || resumeNeedsCheck) { announce('PAUSED - WAIT FOR SESSION CHECK'); return; }
+    playIntent = !playIntent; clock = null; render();
+    announce(playIntent ? 'WILL PLAY AFTER SEEK' : 'WILL REMAIN PAUSED AFTER SEEK'); return;
+  }
   if (state === 'error' || state === 'ended') { void start(launch?.item || item); return; }
   if (state === 'starting' || !active()) { void exit().catch(() => {}); return; }
   if (document.hidden) { announce('PAUSED - RETURN TO RESUME'); return; }
@@ -297,6 +355,7 @@ key = function(value) {
   if (value === '5') return select();
   if (value === '*') { void exit(true).catch(() => {}); return; }
   if (value === '#') return originals.key(value);
+  if (value === '4' || value === '6') { seekBy(value === '4' ? -SEEK_SECONDS : SEEK_SECONDS); return; }
   if (value === '2') {
     if (!active()) { announce('Caption toggle unavailable without active playback.'); return; }
     captionUI.toggle(); render(); announce(captionUI.description()); return;
@@ -327,7 +386,7 @@ document.addEventListener('keydown', event => {
 function visibilityChanged() {
   if (!live() || !active()) return;
   ++visibilityEpoch; playIntent = false; clock = null; resumeNeedsCheck = true;
-  if (metadata) state = 'paused';
+  if (metadata && !seeking) state = 'paused';
   render(); announce(document.hidden ? 'PAUSED - PAGE HIDDEN' : 'CHECKING SESSION - REMAIN PAUSED');
   visibilityPulseWanted = true;
   if (metadata) void poll(generation);
@@ -346,6 +405,10 @@ window.wapflixLive = Object.freeze({inputMatrix, snapshot: () => Object.freeze({
   position, presentedSourceTime: presented?.sourceTime ?? null,
   presentedFrameIndex: presented?.frameIndex ?? null, duration,
   playIntent, warmed, resumeNeedsCheck, hidden: !!document.hidden, visibilityEpoch,
+  seeking: seeking !== null, seekTarget: seeking?.target ?? null,
+  originalRangeStart: rangeStart, originalRangeEnd: rangeEnd,
+  extractPosition: metadata ? metadata.source_start + position - rangeStart : 0,
+  extractDuration: rangeEnd - rangeStart,
   captions:captionUI.snapshot(),
   pollTimer: timer !== null, cleanupPending: cleanup !== null,
   cleanupUnconfirmed: cleanupError !== null})});

@@ -123,7 +123,8 @@ test('action labels match Pause and Resume',async()=>{
 });
 test('numeric unsupported controls and static preferences remain isolated while paused',async()=>{
   const e=environment();await e.play();e.ctx.select();await flush();const before=e.snapshot();
-  for(const key of ['0','1','3','4','6','7','8','9'])e.ctx.key(key);
+  // Numeric 4/6 are seek actions, covered by test_handset_live_seek.cjs.
+  for(const key of ['0','1','3','7','8','9'])e.ctx.key(key);
   held(e,before);assert.equal(e.calls.writes,0);assert.equal(e.calls.key.length,0);
   e.ctx.key('#');assert.deepEqual(e.calls.key,['#']);assert.equal(e.snapshot().state,'paused');
 });
