@@ -1,4 +1,4 @@
-/* 5A.4C visibility and terminal handling. Local fenced host only. */
+/* 5A.5B handset captions, retaining the 5A.4 lifecycle. Local fenced host only. */
 (() => {
 'use strict';
 const cfg = window.wapflixLiveConfig;
@@ -18,18 +18,27 @@ const active = () => ['starting', 'buffering', 'playing', 'paused'].includes(sta
 const current = g => g === generation && live();
 const sourceTime = () => metadata.source_start + position;
 const clearPoll = () => { if (timer !== null) clearInterval(timer); timer = null; };
+if (!window.WapflixLiveCaptions || !window.WapflixHandsetCaptions) throw Error('Live caption modules are required');
+const captionStatus = document.createElement('p');
+captionStatus.id = 'live-caption-status'; captionStatus.className = 'sr';
+captionStatus.setAttribute('role','status'); captionStatus.setAttribute('aria-live','polite'); captionStatus.setAttribute('aria-atomic','true');
+$('lcd')?.appendChild?.(captionStatus);
+const captionUI = window.WapflixHandsetCaptions.create({selector:window.WapflixLiveCaptions,context:ctx,
+  drawText:text,ink,panelColour:()=>typeof lit === 'boolean' && !lit ? '#7c8c62' : '#a6bd70',
+  onText:value=>{captionStatus.textContent=value;}});
+
 // Live-only labels are restored verbatim before returning to static controls.
 const controlLabels = new Map();
 const queryAll = selector => document.querySelectorAll?.(selector) || [];
 function labelControl(element, label, unavailable = false) {
   if (!controlLabels.has(element)) controlLabels.set(element, {
-    label: element.getAttribute('aria-label'), disabled: element.getAttribute('aria-disabled')});
+    label: element.getAttribute('aria-label'), disabled: element.getAttribute('aria-disabled'), pressed: element.getAttribute('aria-pressed')});
   if (element.getAttribute('aria-label') !== label) element.setAttribute('aria-label', label);
   if (unavailable) element.setAttribute('aria-disabled', 'true');
 }
 function restoreControls() {
   for (const [element, saved] of controlLabels) {
-    for (const [name, value] of [['aria-label', saved.label], ['aria-disabled', saved.disabled]]) {
+    for (const [name, value] of [['aria-label', saved.label], ['aria-disabled', saved.disabled], ['aria-pressed', saved.pressed]]) {
       if (value == null) element.removeAttribute?.(name); else element.setAttribute(name, value);
     }
   }
@@ -45,9 +54,13 @@ function syncControls() {
   for (const element of queryAll('.handset-up,.handset-down,.roller-up,.roller-down,.nav [data-key="2"],.nav [data-key="8"],.nav [data-key="4"]')) {
     labelControl(element, 'Navigation unavailable during live playback', true);
   }
-  const unavailable = {'0':'Quality change', '1':'Info', '2':'Caption toggle', '3':'Sharing', '4':'Seek', '6':'Seek', '7':'LCD/ASCII switch', '8':'Navigation', '9':'Control 9'};
+  const unavailable = {'0':'Quality change', '1':'Info', '3':'Sharing', '4':'Seek', '6':'Seek', '7':'LCD/ASCII switch', '8':'Navigation', '9':'Control 9'};
   for (const [digit, label] of Object.entries(unavailable)) {
     for (const element of queryAll('.keypad [data-key="' + digit + '"]')) labelControl(element, label + ' unavailable during live playback', true);
+  }
+  for (const element of queryAll('.keypad [data-key="2"]')) {
+    labelControl(element, captionUI.enabled ? 'Disable live captions' : 'Enable live captions');
+    element.removeAttribute?.('aria-disabled'); element.setAttribute('aria-pressed',String(captionUI.enabled));
   }
   for (const element of queryAll('.handset-end,.keypad [data-key="*"]')) labelControl(element, 'Stop live playback and return Home');
 }
@@ -60,7 +73,7 @@ function restoreFocus(target) {
 const inputMatrix = Object.freeze({
   select: 'Cancel startup; otherwise Pause/Resume; terminal explicit Restart/Replay',
   back: 'Stop and return to launch screen', home: 'Stop and return Home',
-  numeric2: 'Captions unavailable', numeric4and6: 'Seek unavailable',
+  numeric2: 'Toggle live captions', numeric4and6: 'Seek unavailable',
   rocker: 'Navigation unavailable', rollerMovement: 'Navigation unavailable',
   rollerPress: 'Select', wheel: 'Navigation unavailable', keyboardArrows: 'Navigation unavailable',
   backlight: 'Existing backlight action'
@@ -75,7 +88,7 @@ function release() {
   return operation;
 }
 function terminal(next, message) {
-  const g = generation;
+  const g = generation; captionUI.clear();
   resumeNeedsCheck = false; visibilityPulseWanted = false;
   state = next; errorText = message || ''; clock = null; clearPoll();
   render(); announce(message || 'TRANSMISSION ENDED');
@@ -135,6 +148,7 @@ async function poll(g) {
 }
 async function start(entry) {
   if (live() && active()) return;
+  captionUI.clear();
   const g = ++generation;
   launch = live() && launch ? launch : {view: !['player', 'ended'].includes(view) ? view : 'details', item: entry, focus: document.activeElement, summary: $('summary').textContent};
   ++token; setPlaying(false); clip = null; message = ''; detail = false;
@@ -148,7 +162,7 @@ async function start(entry) {
     // start() itself enforces release/fencing. Never use private adapter methods.
     const meta = await adapter.start();
     if (!current(g) || state !== 'starting' || !meta) return;
-    metadata = meta; duration = meta.range_end - meta.source_start;
+    metadata = meta; duration = meta.range_end - meta.source_start; captionUI.setTrack(meta.captions);
     if (document.hidden) { playIntent = false; resumeNeedsCheck = true; }
     state = playIntent ? 'buffering' : 'paused'; render(); announce(playIntent ? 'BUFFERING' : 'PAUSED');
     timer = setInterval(() => { void poll(g); }, 250);
@@ -157,6 +171,7 @@ async function start(entry) {
 }
 function exit(home = false) {
   if (!live()) return cleanup || Promise.resolve();
+  captionUI.clear();
   const g = ++generation; clearPoll(); pendingPoll = null; clock = null; state = 'stopping';
   ++token; setPlaying(false); clip = null; message = ''; detail = false; last = 0; frame = -1;
   const target = launch;
@@ -204,6 +219,7 @@ function drawFooter() {
 render = function() {
   if (!live()) return originals.render();
   ctx.clearRect(0, 0, 240, 224); drawPicture();
+  captionUI.draw(presented,active());
   if (state === 'starting') center('CONNECTING...', 90);
   else if (state === 'buffering') {
     // Status outside the picture area preserves the held image exactly.
@@ -281,6 +297,10 @@ key = function(value) {
   if (value === '5') return select();
   if (value === '*') { void exit(true).catch(() => {}); return; }
   if (value === '#') return originals.key(value);
+  if (value === '2') {
+    if (!active()) { announce('Caption toggle unavailable without active playback.'); return; }
+    captionUI.toggle(); render(); announce(captionUI.description()); return;
+  }
   const labels = {'0':'Quality', '1':'Info', '2':'Caption toggle', '3':'Sharing', '4':'Seek', '6':'Seek', '7':'LCD/ASCII switch'};
   announce((labels[value] || 'Control ' + value) + ' unavailable in live mode.');
 };
@@ -326,6 +346,7 @@ window.wapflixLive = Object.freeze({inputMatrix, snapshot: () => Object.freeze({
   position, presentedSourceTime: presented?.sourceTime ?? null,
   presentedFrameIndex: presented?.frameIndex ?? null, duration,
   playIntent, warmed, resumeNeedsCheck, hidden: !!document.hidden, visibilityEpoch,
+  captions:captionUI.snapshot(),
   pollTimer: timer !== null, cleanupPending: cleanup !== null,
   cleanupUnconfirmed: cleanupError !== null})});
 })();

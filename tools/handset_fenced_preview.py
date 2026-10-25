@@ -18,7 +18,7 @@ def publish_live(preview, token):
     if any(e.get('id') == 'local-stream-test' for e in entries):
         raise ValueError('Live entry ID collides with static catalogue')
     entries.append({'id': 'local-stream-test', 'title': 'Local stream test',
-                    'description': 'One server-configured LCD stream. Select stops; Back returns.',
+                    'description': 'One server-configured LCD stream. Select pauses/resumes; 2 toggles captions.',
                     'playback_type': 'local-stream', 'source_identity': 'configured-test'})
     html, html_kind = preview.routes['/']
     if html.count(b'</body>') != 1:
@@ -27,6 +27,8 @@ def publish_live(preview, token):
     config = config.replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     scripts = (f'<script nonce="{preview.nonce}">window.wapflixLiveConfig={config};</script>'
                '<script src="./stream-source.js" defer></script>'
+               '<script src="./live-captions.js" defer></script>'
+               '<script src="./handset-captions.js" defer></script>'
                '<script src="./handset-live.js" defer></script>')
     preview.routes['/'] = (html.replace(b'</body>', scripts.encode() + b'</body>'), html_kind)
     preview.routes['/assets/catalogue.json'] = (json.dumps(entries).encode(), kind)
@@ -36,7 +38,8 @@ class HandsetHost:
     def __init__(self, root, spec, *, allowed_hosts=(), subtitles=None,
                  no_srt=False, monitor=True, enable_live=False):
         self.preview = static.Preview(root, allowed_hosts)
-        for name in ('stream-source.js', 'handset-live.js'):
+        for name in ('stream-source.js', 'handset-live.js') + (
+                ('live-captions.js', 'handset-captions.js') if enable_live else ()):
             self.preview.routes['/' + name] = (
                 static.confined(self.preview.root, name), 'text/javascript; charset=utf-8')
         self.live_enabled = enable_live

@@ -87,6 +87,9 @@ function environment(model='3310'){
     function tick(t){calls.staticTick++;requestAnimationFrame(tick);}requestAnimationFrame(tick);
   `,ctx);
   setModel(model);
+  for (const name of ['live-captions.js','handset-captions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name),'utf8'),ctx,{filename:name});
+  }
   vm.runInContext(SOURCE,ctx,{filename:'handset-live.js'});queue.shift()(0);
   left.onclick=()=>ctx.select();back.onclick=()=>ctx.back();for(const [k,e]of Object.entries(keypad))e.onclick=()=>ctx.key(k);
   const run=s=>vm.runInContext(s,ctx);
@@ -120,11 +123,12 @@ for(const model of ['3210','3310','8210','6310','7110']){
     e.click(e.physical.up);e.click(e.physical.down);
     assert.equal(e.snapshot().playIntent,before.playIntent);assert.equal(e.snapshot().position,before.position);
     assert.deepEqual(e.calls.keys,[]);assert.match(e.elements.get('summary').textContent,/Navigation unavailable/);
-    e.click(e.keypad['2']);assert.match(e.elements.get('summary').textContent,/Caption toggle unavailable/);
+    assert.equal(e.snapshot().captions.enabled,before.captions.enabled);
+    e.click(e.keypad['2']);assert.equal(e.snapshot().captions.enabled,!before.captions.enabled);
   });
   test(model+' live labels are restored exactly on exit',async()=>{
     const e=environment(model);const before=e.keypad['2'].getAttribute('aria-label');
-    await e.play();assert.equal(e.keypad['2'].attrs['aria-disabled'],'true');e.ctx.back();
+    await e.play();assert.equal(e.keypad['2'].getAttribute('aria-disabled'),null);assert.equal(e.keypad['2'].getAttribute('aria-pressed'),'true');e.ctx.back();
     assert.equal(e.keypad['2'].getAttribute('aria-label'),before);assert.equal(e.keypad['2'].getAttribute('aria-disabled'),null);
     assert.equal(e.keypad['5'].getAttribute('aria-label'),null);
     if(e.physical.call)assert.equal(e.physical.call.attrs['aria-label'],'Select or play and pause');
@@ -208,7 +212,7 @@ test('7110 wheel over press never selects; modified wheel remains native',async(
 test('keyboard arrows distinguish navigation from numeric 2 and respect native fields',async()=>{
   const e=environment();await e.play();const target=e.element('body');
   const arrow=e.event('keydown',target,{key:'ArrowUp'});assert.equal(arrow.stopped,true);
-  e.ctx.key('2');assert.match(e.elements.get('summary').textContent,/Caption toggle/);
+  e.ctx.key('2');assert.equal(e.snapshot().captions.enabled,false);
   for(const selector of ['input','select','textarea','[contenteditable]','.handset-tools','dialog']){
     const field=e.element('field',[selector]);const native=e.event('keydown',field,{key:'ArrowDown'});assert.equal(native.stopped,undefined);
   }
@@ -226,7 +230,7 @@ test('repeated cycles retain exactly one RAF and at most one active timer',async
   }assert.equal(e.adapter.starts,8);assert.equal(e.adapter.stops,8);
 });
 test('read-only input-origin matrix is explicit and cannot change bridge controls',()=>{
-  const e=environment();assert.equal(e.ctx.wapflixLive.inputMatrix.rollerPress,'Select');assert.equal(e.ctx.wapflixLive.inputMatrix.numeric2,'Captions unavailable');
+  const e=environment();assert.equal(e.ctx.wapflixLive.inputMatrix.rollerPress,'Select');assert.equal(e.ctx.wapflixLive.inputMatrix.numeric2,'Toggle live captions');
   assert.ok(Object.isFrozen(e.ctx.wapflixLive.inputMatrix));
 });
 test('all movement label overrides restore after switching through all five models',async()=>{

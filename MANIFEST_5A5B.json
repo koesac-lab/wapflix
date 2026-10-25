@@ -1,0 +1,140 @@
+{
+  "milestone": "5A.5B handset captions",
+  "patches": {
+    "handset-live.js": {
+      "before": "4c5f733cbc08d25c720e339acbc7ef7ac2118335",
+      "edits": [
+        [
+          "/* 5A.4C visibility and terminal handling. Local fenced host only. */",
+          "/* 5A.5B handset captions, retaining the 5A.4 lifecycle. Local fenced host only. */"
+        ],
+        [
+          "const clearPoll = () => { if (timer !== null) clearInterval(timer); timer = null; };",
+          "const clearPoll = () => { if (timer !== null) clearInterval(timer); timer = null; };\nif (!window.WapflixLiveCaptions || !window.WapflixHandsetCaptions) throw Error('Live caption modules are required');\nconst captionStatus = document.createElement('p');\ncaptionStatus.id = 'live-caption-status'; captionStatus.className = 'sr';\ncaptionStatus.setAttribute('role','status'); captionStatus.setAttribute('aria-live','polite'); captionStatus.setAttribute('aria-atomic','true');\n$('lcd')?.appendChild?.(captionStatus);\nconst captionUI = window.WapflixHandsetCaptions.create({selector:window.WapflixLiveCaptions,context:ctx,\n  drawText:text,ink,panelColour:()=>typeof lit === 'boolean' && !lit ? '#7c8c62' : '#a6bd70',\n  onText:value=>{captionStatus.textContent=value;}});\n"
+        ],
+        [
+          "    label: element.getAttribute('aria-label'), disabled: element.getAttribute('aria-disabled')});",
+          "    label: element.getAttribute('aria-label'), disabled: element.getAttribute('aria-disabled'), pressed: element.getAttribute('aria-pressed')});"
+        ],
+        [
+          "    for (const [name, value] of [['aria-label', saved.label], ['aria-disabled', saved.disabled]]) {",
+          "    for (const [name, value] of [['aria-label', saved.label], ['aria-disabled', saved.disabled], ['aria-pressed', saved.pressed]]) {"
+        ],
+        [
+          "  const unavailable = {'0':'Quality change', '1':'Info', '2':'Caption toggle', '3':'Sharing', '4':'Seek', '6':'Seek', '7':'LCD/ASCII switch', '8':'Navigation', '9':'Control 9'};",
+          "  const unavailable = {'0':'Quality change', '1':'Info', '3':'Sharing', '4':'Seek', '6':'Seek', '7':'LCD/ASCII switch', '8':'Navigation', '9':'Control 9'};"
+        ],
+        [
+          "  for (const element of queryAll('.handset-end,.keypad [data-key=\"*\"]')) labelControl(element, 'Stop live playback and return Home');",
+          "  for (const element of queryAll('.keypad [data-key=\"2\"]')) {\n    labelControl(element, captionUI.enabled ? 'Disable live captions' : 'Enable live captions');\n    element.removeAttribute?.('aria-disabled'); element.setAttribute('aria-pressed',String(captionUI.enabled));\n  }\n  for (const element of queryAll('.handset-end,.keypad [data-key=\"*\"]')) labelControl(element, 'Stop live playback and return Home');"
+        ],
+        [
+          "  numeric2: 'Captions unavailable', numeric4and6: 'Seek unavailable',",
+          "  numeric2: 'Toggle live captions', numeric4and6: 'Seek unavailable',"
+        ],
+        [
+          "function terminal(next, message) {\n  const g = generation;",
+          "function terminal(next, message) {\n  const g = generation; captionUI.clear();"
+        ],
+        [
+          "async function start(entry) {\n  if (live() && active()) return;",
+          "async function start(entry) {\n  if (live() && active()) return;\n  captionUI.clear();"
+        ],
+        [
+          "    metadata = meta; duration = meta.range_end - meta.source_start;",
+          "    metadata = meta; duration = meta.range_end - meta.source_start; captionUI.setTrack(meta.captions);"
+        ],
+        [
+          "function exit(home = false) {\n  if (!live()) return cleanup || Promise.resolve();",
+          "function exit(home = false) {\n  if (!live()) return cleanup || Promise.resolve();\n  captionUI.clear();"
+        ],
+        [
+          "  ctx.clearRect(0, 0, 240, 224); drawPicture();",
+          "  ctx.clearRect(0, 0, 240, 224); drawPicture();\n  captionUI.draw(presented,active());"
+        ],
+        [
+          "  if (value === '#') return originals.key(value);",
+          "  if (value === '#') return originals.key(value);\n  if (value === '2') {\n    if (!active()) { announce('Caption toggle unavailable without active playback.'); return; }\n    captionUI.toggle(); render(); announce(captionUI.description()); return;\n  }"
+        ],
+        [
+          "  pollTimer: timer !== null, cleanupPending: cleanup !== null,",
+          "  captions:captionUI.snapshot(),\n  pollTimer: timer !== null, cleanupPending: cleanup !== null,"
+        ]
+      ]
+    },
+    "tools/handset_fenced_preview.py": {
+      "before": "918304b88b9742aedaf4d4cc66d8dd6a5e24f804",
+      "edits": [
+        [
+          "'description': 'One server-configured LCD stream. Select stops; Back returns.',",
+          "'description': 'One server-configured LCD stream. Select pauses/resumes; 2 toggles captions.',"
+        ],
+        [
+          "               '<script src=\"./handset-live.js\" defer></script>')",
+          "               '<script src=\"./live-captions.js\" defer></script>'\n               '<script src=\"./handset-captions.js\" defer></script>'\n               '<script src=\"./handset-live.js\" defer></script>')"
+        ],
+        [
+          "        for name in ('stream-source.js', 'handset-live.js'):",
+          "        for name in ('stream-source.js', 'handset-live.js') + (\n                ('live-captions.js', 'handset-captions.js') if enable_live else ()):"
+        ]
+      ]
+    },
+    "tests/test_handset_live_bridge.cjs": {
+      "before": "6d865a78a8f97615d430222929c86f7ce8c0761c",
+      "edits": [
+        [
+          "  vm.runInContext(source,ctx,{filename:'handset-live.js'});",
+          "  for (const name of ['live-captions.js','handset-captions.js']) {\n    vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name),'utf8'),ctx,{filename:name});\n  }\n  vm.runInContext(source,ctx,{filename:'handset-live.js'});"
+        ],
+        [
+          "for(const k of ['0','1','2','3','4','6','7','8','9'])",
+          "for(const k of ['0','1','3','4','6','7','8','9'])"
+        ]
+      ]
+    },
+    "tests/test_handset_live_pause.cjs": {
+      "before": "46ad2fc5d288797dc1557b05812ac0c4cbc58999",
+      "edits": [
+        [
+          "for(const key of ['0','1','2','3','4','6','7','8','9'])e.ctx.key(key);",
+          "for(const key of ['0','1','3','4','6','7','8','9'])e.ctx.key(key);"
+        ]
+      ]
+    },
+    "tests/test_handset_live_navigation.cjs": {
+      "before": "95d0163ff92c9200c7cb44549643e72f918a93af",
+      "edits": [
+        [
+          "  vm.runInContext(SOURCE,ctx,{filename:'handset-live.js'});queue.shift()(0);",
+          "  for (const name of ['live-captions.js','handset-captions.js']) {\n    vm.runInContext(fs.readFileSync(path.join(__dirname,'..',name),'utf8'),ctx,{filename:name});\n  }\n  vm.runInContext(SOURCE,ctx,{filename:'handset-live.js'});queue.shift()(0);"
+        ],
+        [
+          "    e.click(e.keypad['2']);assert.match(e.elements.get('summary').textContent,/Caption toggle unavailable/);",
+          "    assert.equal(e.snapshot().captions.enabled,before.captions.enabled);\n    e.click(e.keypad['2']);assert.equal(e.snapshot().captions.enabled,!before.captions.enabled);"
+        ],
+        [
+          "    await e.play();assert.equal(e.keypad['2'].attrs['aria-disabled'],'true');e.ctx.back();",
+          "    await e.play();assert.equal(e.keypad['2'].getAttribute('aria-disabled'),null);assert.equal(e.keypad['2'].getAttribute('aria-pressed'),'true');e.ctx.back();"
+        ],
+        [
+          "  e.ctx.key('2');assert.match(e.elements.get('summary').textContent,/Caption toggle/);",
+          "  e.ctx.key('2');assert.equal(e.snapshot().captions.enabled,false);"
+        ],
+        [
+          "assert.equal(e.ctx.wapflixLive.inputMatrix.numeric2,'Captions unavailable');",
+          "assert.equal(e.ctx.wapflixLive.inputMatrix.numeric2,'Toggle live captions');"
+        ]
+      ]
+    }
+  },
+  "requires": {
+    "live-captions.js": "9ad48646ed6bc79e4fa4fcba85645de355c568c4"
+  },
+  "sha256": {
+    "CHECKPOINT_5A5B_HANDSET_CAPTIONS.md": "0112885e99b74475369fad046fcfac178b4ee5cde3772d8ae4adc0a1c99c40cc",
+    "handset-captions.js": "d63ab4110060eeb10984c2e77ddc200cacd8d4beae7b1effbe611f1fc65ffac0",
+    "tests/test_handset_caption_host.py": "375d443f73e8f3259692c08f5cb5525fe4174d10cb24ceb6ace8b621772b89b8",
+    "tests/test_handset_captions.cjs": "58bbc96a9caa3ea003aa0ccbe0a38b3fec037eced0111ed727c36a064085cf79",
+    "tools/apply_handset_5a5b.py": "bf4c75f92ee99aff51f68abe811fbdfbe1fc63be382469921c33df808b3ad746"
+  }
+}
