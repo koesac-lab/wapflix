@@ -1,0 +1,25 @@
+{
+  "milestone": "5A.6A adapter restart-seeking",
+  "requires": {},
+  "patches": {
+    "stream-source.js": {
+      "before": "a908970423716fbb395c200aadebc2edbe3c9f2d",
+      "edits": [
+        [
+          "/* R2C: fenced standalone transport adapter. No DOM, rendering, background polling or auto-start. */",
+          "/* R2C: fenced standalone transport adapter. 5A.6A adds explicit restart-seeking. No DOM, rendering, background polling or auto-start. */"
+        ],
+        [
+          "  this._warmed=false; // Latched for this stream generation, independent of cache eviction.\n }",
+          "  this._warmed=false; // Latched for this stream generation, independent of cache eviction.\n }\n\n seek(sourceTime){\n  // 5A.6A: an explicit seek is a replacement Start at a quantised source time.\n  const m=this._metadata;\n  if(!m||this._state!=='ready')return Promise.reject(Error('Seek requires an active stream'));\n  if(typeof sourceTime!=='number'||!Number.isFinite(sourceTime))return Promise.reject(TypeError('A finite source time is required'));\n  const requested=Math.min(Math.max(sourceTime,m.range_start),m.range_end);\n  const frame=Math.max(0,Math.floor((requested-m.source_start)*m.fps+1e-7));\n  const destination=m.source_start+frame/m.fps;\n  const g=this._invalidate('starting');this._cancelCurrent();\n  return this._enqueue(async()=>{\n   try{\n    await this._releaseOwned();if(g!==this._generation)return null;\n    const control=await this._openControl(g);if(!control||g!==this._generation)return null;\n    if(this._revision>=Number.MAX_SAFE_INTEGER)throw Error('Start revision exhausted; create a new source');\n    const intent={control,revision:++this._revision,controller:new AbortController(),cancelled:false,fenced:false,cancelPromise:null};\n    this._intent=intent;\n    const data=await this._api('/api/start',{control_client_id:control.id,start_revision:intent.revision},intent.controller.signal);\n    if(g!==this._generation)return null;\n    if(data?.control_protocol!=='start-fence-v1'||data.control_client_id!==control.id||data.start_revision!==intent.revision)throw Error('Invalid fenced Start identity');\n    const metadata=this._validateMetadata(data);\n    this._owned={navigation_id:metadata.navigation_id};this._metadata=metadata;this._state='ready';\n    return Object.freeze({requested:sourceTime,destination,frame,metadata});\n   }catch(error){\n    if(g!==this._generation)return null;\n    if(['control_client_gone','client_superseded','client_expired'].includes(error.code))this._control=null;\n    try{await this._releaseOwned();}catch(cleanup){error.cleanupError=cleanup;}\n    if(g!==this._generation)return null;\n    this._state='error';this._error=error;throw error;\n   }\n  });\n }\n"
+        ]
+      ]
+    }
+  },
+  "sha256": {
+    "CHECKPOINT_5A6A_ADAPTER_SEEK.md": "27b209405e51316d71af35416bded27f91c12d2b32136e5923d8754143a8455c",
+    "stream-source.js": "17fe05ede5499b526c5ec2b5fda32868e62f3a62ad9b28876eef63376b52f8d1",
+    "tests/test_stream_source_seek.cjs": "5977785d05f998dbc3ee127c3e7eed38c1c7508bc1b9d57da1893049b854c39f",
+    "tools/apply_stream_5a6a.py": "2f283cfd3ae0caf03e607734f6f80329b542fce8013466089bcf1ac93a7415ca"
+  }
+}

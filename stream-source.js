@@ -1,4 +1,4 @@
-/* R2C: fenced standalone transport adapter. No DOM, rendering, background polling or auto-start. */
+/* R2C: fenced standalone transport adapter. 5A.6A adds explicit restart-seeking. No DOM, rendering, background polling or auto-start. */
 (function(root){
 'use strict';
 class WapflixStreamSource {
@@ -16,6 +16,39 @@ class WapflixStreamSource {
   this._control=null;this._revision=0;this._intent=null;this._opening=null;
   this._warmed=false; // Latched for this stream generation, independent of cache eviction.
  }
+
+ seek(sourceTime){
+  // 5A.6A: an explicit seek is a replacement Start at a quantised source time.
+  const m=this._metadata;
+  if(!m||this._state!=='ready')return Promise.reject(Error('Seek requires an active stream'));
+  if(typeof sourceTime!=='number'||!Number.isFinite(sourceTime))return Promise.reject(TypeError('A finite source time is required'));
+  const requested=Math.min(Math.max(sourceTime,m.range_start),m.range_end);
+  const frame=Math.max(0,Math.floor((requested-m.source_start)*m.fps+1e-7));
+  const destination=m.source_start+frame/m.fps;
+  const g=this._invalidate('starting');this._cancelCurrent();
+  return this._enqueue(async()=>{
+   try{
+    await this._releaseOwned();if(g!==this._generation)return null;
+    const control=await this._openControl(g);if(!control||g!==this._generation)return null;
+    if(this._revision>=Number.MAX_SAFE_INTEGER)throw Error('Start revision exhausted; create a new source');
+    const intent={control,revision:++this._revision,controller:new AbortController(),cancelled:false,fenced:false,cancelPromise:null};
+    this._intent=intent;
+    const data=await this._api('/api/start',{control_client_id:control.id,start_revision:intent.revision},intent.controller.signal);
+    if(g!==this._generation)return null;
+    if(data?.control_protocol!=='start-fence-v1'||data.control_client_id!==control.id||data.start_revision!==intent.revision)throw Error('Invalid fenced Start identity');
+    const metadata=this._validateMetadata(data);
+    this._owned={navigation_id:metadata.navigation_id};this._metadata=metadata;this._state='ready';
+    return Object.freeze({requested:sourceTime,destination,frame,metadata});
+   }catch(error){
+    if(g!==this._generation)return null;
+    if(['control_client_gone','client_superseded','client_expired'].includes(error.code))this._control=null;
+    try{await this._releaseOwned();}catch(cleanup){error.cleanupError=cleanup;}
+    if(g!==this._generation)return null;
+    this._state='error';this._error=error;throw error;
+   }
+  });
+ }
+
  get state(){return this._state;}
  get error(){return this._error;}
  get metadata(){return this._metadata;}
