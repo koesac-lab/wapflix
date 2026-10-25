@@ -14,6 +14,19 @@ import time
 
 DEFAULT_VIDEO=Path.home()/'.local/share/wapflix/test-media/dQw4w9WgXcQ/source.mp4'
 
+def resolve_ascii_dimensions(width=None,height=None):
+    if (width is None)!=(height is None):
+        raise ValueError('ASCII width and height must be provided together')
+    if width is None:
+        return None,None
+    if type(width) is not int or type(height) is not int:
+        raise ValueError('ASCII width and height must be integers')
+    if not 8<=width<=240:
+        raise ValueError('ASCII width must be 8..240')
+    if not 2<=height<=200:
+        raise ValueError('ASCII height must be 2..200')
+    return width,height
+
 def read_frame(source,size):
     raw=bytearray()
     while len(raw)<size:
@@ -47,13 +60,16 @@ def inspect_video(video):
     return cols,rows,duration
 
 class LCDStream:
-    def __init__(self,video,start=30,seconds=60):
+    def __init__(self,video,start=30,seconds=60,ascii_width=None,ascii_height=None):
         if not math.isfinite(start) or start<0 or not math.isfinite(seconds) or not 0<seconds<=120:
             raise ValueError('Use start >= 0 and 0 < seconds <= 120 for this milestone')
         self.video=Path(video).expanduser().resolve()
         if not self.video.is_file(): raise ValueError('Source video is missing')
         if not all(shutil.which(t) for t in ('ffmpeg','ffprobe')): raise ValueError('Install FFmpeg and ffprobe')
         self.cols,self.rows,duration=inspect_video(self.video)
+        requested_cols,requested_rows=resolve_ascii_dimensions(ascii_width,ascii_height)
+        if requested_cols is not None:
+            self.cols=requested_cols;self.rows=requested_rows
         if start>=duration: raise ValueError('Start is after the video ends')
         self.start=start;self.seconds=min(seconds,duration-start)
         self.fps=8;self.chunk_frames=16;self.process=None;self.errors=None

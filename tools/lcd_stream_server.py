@@ -13,17 +13,18 @@ import threading
 import time
 from urllib.parse import parse_qs, urlsplit
 try:
-    from .lcd_chunker import LCDStream, DEFAULT_VIDEO
+    from .lcd_chunker import LCDStream, DEFAULT_VIDEO, resolve_ascii_dimensions
 except ImportError:
     try:
-        from lcd_chunker import LCDStream, DEFAULT_VIDEO
+        from lcd_chunker import LCDStream, DEFAULT_VIDEO, resolve_ascii_dimensions
     except ImportError as error:
         raise SystemExit('Install milestone 1 (tools/lcd_chunker.py) first.') from error
 
 class Session:
     def __init__(self, app):
         self.app=app;self.id=secrets.token_hex(16)
-        self.stream=LCDStream(app.video,app.start,app.seconds)
+        self.stream=LCDStream(app.video,app.start,app.seconds,
+            ascii_width=app.ascii_width,ascii_height=app.ascii_height)
         self.lock=threading.RLock();self.lifecycle=threading.Lock();self.stop_event=threading.Event()
         self.chunks={};self.generated=0;self.ready_frames=0;self.total_frames=None
         self.frame=0;self.paused=False;self.state='running';self.error=None
@@ -78,11 +79,12 @@ class Session:
             with self.lifecycle: self.stream.close()
 
 class App:
-    def __init__(self,video,start=30,seconds=60,delay=0,lease=15):
+    def __init__(self,video,start=30,seconds=60,delay=0,lease=15,ascii_width=None,ascii_height=None):
         if not math.isfinite(delay) or not 0<=delay<=5: raise ValueError('Delay must be 0..5 seconds')
         if not math.isfinite(lease) or lease<=0: raise ValueError('Invalid session lease')
+        self.ascii_width,self.ascii_height=resolve_ascii_dimensions(ascii_width,ascii_height)
         self.video=Path(video);self.start=start;self.seconds=seconds;self.delay=delay;self.lease=lease
-        LCDStream(self.video,start,seconds)
+        LCDStream(self.video,start,seconds,ascii_width=self.ascii_width,ascii_height=self.ascii_height)
         self.html=Path(__file__).with_name('lcd_stream_viewer.html').read_text()
         self.token=secrets.token_hex(24);self.lock=threading.Lock();self.current=None
         self.closing=threading.Event();self.monitor=threading.Thread(target=self.reap,daemon=True);self.monitor.start()
@@ -113,7 +115,6 @@ def make_handler(app):
         def setup(self): super().setup();self.connection.settimeout(5)
         def log_message(self,*args): pass
         def host_ok(self):
-            # M2_LAN_V1: accept this connection's local IP, plus explicit aliases.
             try:
                 parsed=urlsplit('http://'+self.headers.get('Host',''))
                 port=parsed.port if parsed.port is not None else 80
@@ -170,7 +171,8 @@ def make_handler(app):
                 if path=='/api/stop': session.stop();return self.reply(200,{'stopped':True})
                 return self.reply(404,{'error':'Not found'})
             except KeyError: return self.reply(404,{'error':'Session not found'})
-            except (ValueError,TypeError) as error: return self.reply(400,{'error':str(error)})
+            except (ValueError,TypeError) as error:
+                return self.reply(400,{'error':str(error)})
             except TimeoutError: return self.reply(408,{'error':'Request timeout'})
             except (OSError,RuntimeError,subprocess.SubprocessError) as error:
                 print(error,file=sys.stderr);return self.reply(503,{'error':'Unable to start or stop conversion; check server terminal.'})
@@ -185,7 +187,10 @@ def main():
     p.add_argument('--allow-host',action='append',default=[],help='Optional trusted hostname alias, without port')
     p.add_argument('--start',type=float,default=30);p.add_argument('--seconds',type=float,default=60)
     p.add_argument('--port',type=int,default=8101);p.add_argument('--delay',type=float,default=0,help='Artificial delay per chunk, 0..5 seconds')
-    args=p.parse_args();app=App(args.video,args.start,args.seconds,args.delay);server=None
+    p.add_argument('--ascii-width',type=int,default=None,help='Optional ASCII canvas width; requires --ascii-height')
+    p.add_argument('--ascii-height',type=int,default=None,help='Optional ASCII canvas height; requires --ascii-width')
+    args=p.parse_args();app=App(args.video,args.start,args.seconds,args.delay,
+        ascii_width=args.ascii_width,ascii_height=args.ascii_height);server=None
     app.allowed_hosts={h.lower().rstrip('.') for h in args.allow_host}
     try:
         server=Server((args.bind,args.port),make_handler(app))
