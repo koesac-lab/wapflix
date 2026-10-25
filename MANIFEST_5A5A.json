@@ -1,0 +1,14 @@
+{
+  "milestone": "5A.5A pure source-time caption selection",
+  "required_files": [
+    "handset-live.js",
+    "stream-source.js",
+    "MANIFEST_5A4C.json"
+  ],
+  "sha256": {
+    "CHECKPOINT_5A5A_CAPTION_SELECTION.md": "2a888a815f92315311d2a45fe49ffe98d2f7a1d85a8aff5cc2e771f609b4ad04",
+    "live-captions.js": "ec8ba5cd6ec701a675c5cc715033e58f2fb8fcb2991f78cbb2b0a2fd58dd8b3e",
+    "tests/test_live_captions.cjs": "1257987d441b3c6f58be729f7358a8ab2519b9b0d7335d05fba1bf3839b8a7ca",
+    "tools/apply_handset_5a5a.py": "706f1f87a0225bb2350c6560cab2d8b83eab5c34e9bbd4aeca922a60fc590b20"
+  }
+}
