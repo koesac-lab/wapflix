@@ -2,6 +2,7 @@
 """Bounded, identity-scoped persistent cache for generated LCD chunks."""
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
@@ -22,9 +23,19 @@ class PersistentChunkCache:
             raise ValueError('Cache ceiling must be non-negative')
         self.root.mkdir(parents=True, exist_ok=True)
         self.state_root.mkdir(parents=True, exist_ok=True)
+        self.quarantine = self.root / '.quarantine'
+        self.quarantine.mkdir(exist_ok=True)
         self._lock = threading.RLock()
+        self._reconcile()
         self._total = self._scan()
         self._write_state()
+
+    def _reconcile(self):
+        for path in self.root.rglob('.chunk-*.tmp'):
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
     def _scan(self):
         total = 0
@@ -52,6 +63,25 @@ class PersistentChunkCache:
     @staticmethod
     def _chunk_path(stream_dir, index):
         return stream_dir / f'chunk-{int(index):06}.json.gz'
+
+    def _valid_gzip(self, path):
+        try:
+            with gzip.open(path, 'rb') as handle:
+                while handle.read(65536):
+                    pass
+            return True
+        except (OSError, EOFError, gzip.BadGzipFile):
+            return False
+
+    def _quarantine(self, path):
+        try:
+            target = self.quarantine / f'{int(time.time() * 1000)}-{path.name}'
+            os.replace(path, target)
+        except OSError:
+            try:
+                path.unlink()
+            except OSError:
+                pass
 
     def _write_state(self):
         entries = sum(1 for _ in self.root.rglob('chunk-*.json.gz'))
@@ -134,6 +164,13 @@ class PersistentChunkCache:
     def get(self, identity, index):
         try:
             path = self._chunk_path(self._stream_dir(identity), index)
+            if not path.is_file():
+                return None
+            if not self._valid_gzip(path):
+                self._quarantine(path)
+                self._total = self._scan()
+                self._write_state()
+                return None
             return path.read_bytes()
         except (OSError, ValueError):
             return None

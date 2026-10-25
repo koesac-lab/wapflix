@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import gzip
 import json
 import tempfile
 import unittest
@@ -65,6 +66,41 @@ class PersistentChunkCacheTests(unittest.TestCase):
             recorded = json.loads((state / 'cache-state.json').read_text())
             self.assertEqual(recorded['total_bytes'], 5)
             self.assertEqual(recorded['max_bytes'], 100)
+
+    def test_corrupt_chunk_is_quarantined(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'cache'
+            state = Path(directory) / 'state'
+            cache = PersistentChunkCache(root, state)
+            identity = cache.identity('video.mkv', 0, 60, 120, 54, 8)
+            path = root / identity / 'chunk-000000.json.gz'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b'not gzip')
+            self.assertIsNone(cache.get(identity, 0))
+            self.assertFalse(path.exists())
+            self.assertTrue(any(cache.quarantine.iterdir()))
+
+    def test_startup_removes_abandoned_temporary_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'cache'
+            state = Path(directory) / 'state'
+            root.mkdir()
+            temporary = root / 'identity' / '.chunk-abc.tmp'
+            temporary.parent.mkdir()
+            temporary.write_bytes(b'partial')
+            PersistentChunkCache(root, state)
+            self.assertFalse(temporary.exists())
+
+    def test_startup_counts_orphan_published_chunks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'cache'
+            state = Path(directory) / 'state'
+            identity = 'a' * 24
+            path = root / identity / 'chunk-000000.json.gz'
+            path.parent.mkdir(parents=True)
+            path.write_bytes(gzip.compress(b'orphan'))
+            cache = PersistentChunkCache(root, state)
+            self.assertEqual(cache.stats()['total_bytes'], len(path.read_bytes()))
 
 
 if __name__ == '__main__':
