@@ -1,0 +1,11 @@
+.git
+.github
+output/
+assets/
+docs/
+tests/
+*.tar.gz
+*.bak
+__pycache__/
+*.pyc
+.DS_Store

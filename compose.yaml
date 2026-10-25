@@ -1,0 +1,22 @@
+services:
+  wapflix:
+    build: .
+    user: "1000:1000"
+    restart: unless-stopped
+    ports:
+      - "8101:8101"
+    environment:
+      WAPFLIX_VIDEO: "/media/Season 1/Haunted.Hotel.S01E01.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.mkv"
+    volumes:
+      - "/mnt/14TB/TV/Haunted Hotel:/media:ro"
+      - "./data/cache:/cache"
+      - "./data/state:/state"
+    command:
+      - python3
+      - tools/lcd_stream_server.py
+      - --video
+      - "/media/Season 1/Haunted.Hotel.S01E01.1080p.10bit.WEBRip.6CH.x265.HEVC-PSA.mkv"
+      - --bind
+      - 0.0.0.0
+      - --port
+      - "8101"
