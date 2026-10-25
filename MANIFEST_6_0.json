@@ -1,0 +1,18 @@
+{
+  "checkpoint": "6.0A",
+  "baseline_commit": "055169fe37d5b07ce36249485d2344b9ceeb822b",
+  "dependencies": {
+    "stream-source.js": "420e9eb8e3ed64a2ddcabc45ade00f35f7faa6c6",
+    "tools/lcd_stream_fenced_api.py": "1e3341ca0841d65bad4f72bb11ed46d85a594a00",
+    "PHASE6_DEPLOYMENT_PLAN.md": "e908fb85d38fd95853bf713d185bbc37cfa643b1"
+  },
+  "files": {
+    "CHECKPOINT_6_0_CONTRACT_FREEZE.md": "18ec1b030ebfc17d3a159c045a9d8793f20e3005e2e136343faa91888cde14ea",
+    "tools/apply_phase6_0.py": "4afacbd17f587d50eb429426011d89abc89731c76fb9c9b88fea5d81209bac32",
+    "tools/deployment_inventory.py": "e3cf70f074b58040548ae5b0a6c241305d8b8a39e3c2e89059764cf7c4dc6c57",
+    "tests/test_deployment_inventory.py": "e4ad8f779a6364fc63e56ad4571d140236954a8208176f383ce2cf40571147d6"
+  },
+  "new_files_only": true,
+  "deployment_complete": false,
+  "inventory_unit_tests_passed": 22
+}
