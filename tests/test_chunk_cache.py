@@ -36,7 +36,7 @@ class PersistentChunkCacheTests(unittest.TestCase):
 
     def test_active_window_is_protected(self):
         with tempfile.TemporaryDirectory() as directory:
-            cache = PersistentChunkCache(Path(directory) / 'cache', Path(directory) / 'state', max_bytes=10)
+            cache = PersistentChunkCache(Path(directory) / 'cache', Path(directory) / 'state', max_bytes=8)
             identity = cache.identity('video.mkv', 0, 60, 120, 54, 8)
             self.assertTrue(cache.put(identity, 0, b'12345'))
             self.assertFalse(cache.put(identity, 1, b'67890', protected_indices={0}))
