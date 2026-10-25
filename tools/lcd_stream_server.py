@@ -14,9 +14,11 @@ import time
 from urllib.parse import parse_qs, urlsplit
 try:
     from .lcd_chunker import LCDStream, DEFAULT_VIDEO, resolve_ascii_dimensions
+    from .chunk_cache import PersistentChunkCache
 except ImportError:
     try:
         from lcd_chunker import LCDStream, DEFAULT_VIDEO, resolve_ascii_dimensions
+        from chunk_cache import PersistentChunkCache
     except ImportError as error:
         raise SystemExit('Install milestone 1 (tools/lcd_chunker.py) first.') from error
 
@@ -37,6 +39,10 @@ class Session:
                 generated_chunks=self.generated,ready_frames=self.ready_frames,total_frames=self.total_frames,
                 retained_chunks=len(self.chunks),first_chunk_seconds=self.first,
                 worker_running=self.stream.process is not None and self.stream.process.poll() is None)
+    def _protected_indices(self):
+        with self.lock:
+            floor=max(0,self.frame//self.stream.chunk_frames-1)
+            return set(range(floor,self.generated+1))
     def pulse(self, frame, paused):
         if type(frame) is not int or frame<0 or type(paused) is not bool: raise ValueError('Invalid playback position')
         with self.lock:
@@ -69,6 +75,9 @@ class Session:
                     self.chunks[chunk['index']]=packed
                     self.generated+=1;self.ready_frames+=len(chunk['frames'])
                     if self.first is None: self.first=self.stream.first_chunk_seconds
+                if self.app.cache is not None:
+                    self.app.cache.put(self.app.cache_identity,chunk['index'],packed,
+                        protected_indices=self._protected_indices())
             with self.lock:
                 if not self.stop_event.is_set(): self.total_frames=self.ready_frames;self.state='complete'
         except Exception as error:
@@ -79,12 +88,21 @@ class Session:
             with self.lifecycle: self.stream.close()
 
 class App:
-    def __init__(self,video,start=30,seconds=60,delay=0,lease=15,ascii_width=None,ascii_height=None):
+    def __init__(self,video,start=30,seconds=60,delay=0,lease=15,ascii_width=None,ascii_height=None,
+            cache_dir=None,state_dir=None,cache_max_bytes=32*1024*1024):
         if not math.isfinite(delay) or not 0<=delay<=5: raise ValueError('Delay must be 0..5 seconds')
         if not math.isfinite(lease) or lease<=0: raise ValueError('Invalid session lease')
         self.ascii_width,self.ascii_height=resolve_ascii_dimensions(ascii_width,ascii_height)
         self.video=Path(video);self.start=start;self.seconds=seconds;self.delay=delay;self.lease=lease
-        LCDStream(self.video,start,seconds,ascii_width=self.ascii_width,ascii_height=self.ascii_height)
+        probe=LCDStream(self.video,start,seconds,ascii_width=self.ascii_width,ascii_height=self.ascii_height)
+        self.cache_identity=PersistentChunkCache.identity(self.video,start,self.seconds,
+            probe.cols,probe.rows,probe.fps)
+        self.cache=None
+        if cache_dir is not None and state_dir is not None and cache_max_bytes>0:
+            try:
+                self.cache=PersistentChunkCache(cache_dir,state_dir,cache_max_bytes)
+            except OSError as error:
+                print(f'Persistent cache disabled: {error}',file=sys.stderr,flush=True)
         self.html=Path(__file__).with_name('lcd_stream_viewer.html').read_text()
         self.token=secrets.token_hex(24);self.lock=threading.Lock();self.current=None
         self.closing=threading.Event();self.monitor=threading.Thread(target=self.reap,daemon=True);self.monitor.start()
@@ -147,7 +165,12 @@ def make_handler(app):
                 if parsed.path!='/api/chunk': return self.reply(404,{'error':'Not found'})
                 n=int(query.get('n',['-1'])[0])
                 if not 0<=n<60: raise ValueError('Invalid chunk index')
-                with session.lock: data=session.chunks.get(n);old=n<session.generated and data is None
+                with session.lock:
+                    data=session.chunks.get(n)
+                    old=n<session.generated and data is None
+                    if data is None and not old and app.cache is not None:
+                        data=app.cache.get(app.cache_identity,n)
+                        if data is not None: session.chunks[n]=data
                 if old: return self.reply(410,{'error':'Chunk evicted or session stopped'})
                 if data is None: return self.reply(204,b'')
                 return self.reply(200,data,packed=True)
@@ -189,8 +212,12 @@ def main():
     p.add_argument('--port',type=int,default=8101);p.add_argument('--delay',type=float,default=0,help='Artificial delay per chunk, 0..5 seconds')
     p.add_argument('--ascii-width',type=int,default=None,help='Optional ASCII canvas width; requires --ascii-height')
     p.add_argument('--ascii-height',type=int,default=None,help='Optional ASCII canvas height; requires --ascii-width')
+    p.add_argument('--cache-dir',type=Path,default=Path('/cache'),help='Persistent chunk-cache directory')
+    p.add_argument('--state-dir',type=Path,default=Path('/state'),help='Persistent cache-state directory')
+    p.add_argument('--cache-max-bytes',type=int,default=32*1024*1024,help='Persistent cache ceiling in bytes')
     args=p.parse_args();app=App(args.video,args.start,args.seconds,args.delay,
-        ascii_width=args.ascii_width,ascii_height=args.ascii_height);server=None
+        ascii_width=args.ascii_width,ascii_height=args.ascii_height,
+        cache_dir=args.cache_dir,state_dir=args.state_dir,cache_max_bytes=args.cache_max_bytes);server=None
     app.allowed_hosts={h.lower().rstrip('.') for h in args.allow_host}
     try:
         server=Server((args.bind,args.port),make_handler(app))
