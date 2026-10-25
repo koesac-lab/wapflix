@@ -174,7 +174,11 @@ class WapflixStreamSource {
    try{
     const data=await this._api('/api/pulse',{id:m.id,frame,paused:paused&&this._warmed},ticket.controller.signal);
     if(!this._current(g,m.id))return null;
-    if(['error','stopped'].includes(data?.state))throw Error(data.error||'Session stopped or expired');
+    if(['error','stopped'].includes(data?.state)){
+     const error=Error(data.error||'Session ended');
+     if(data.state==='error')error.code='conversion_failed';
+     throw error;
+    }
     this._validateStatus(data,m);this._status=Object.freeze({...data});
     const position=data.total_frames!==null&&data.total_frames!==undefined?Math.min(frame,data.total_frames-1):frame;
     const base=Math.floor(position/m.chunk_frames);

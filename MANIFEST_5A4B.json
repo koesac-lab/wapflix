@@ -1,0 +1,23 @@
+{
+  "milestone": "5A.4B navigation and controls",
+  "replaces": {
+    "handset-live.js": "cea962bff9dfb78ad3aae2d25b3aa4c959e6b396"
+  },
+  "requires": {
+    "stream-source.js": "2ee9ebe129943721556c1094cfcc27839ee4ca56",
+    "theme.js": "86e0568544ff36126f8f40d7a3399911d8ac467c",
+    "streaming.js": "01aef733a4dbdf716f42f3f678b20427320b51d7"
+  },
+  "required_files": [
+    "tests/test_handset_live_bridge.cjs",
+    "tests/test_handset_live_pause.cjs",
+    "tools/handset_fenced_preview.py",
+    "tools/lcd_stream_fenced_api.py"
+  ],
+  "sha256": {
+    "CHECKPOINT_5A4B_NAVIGATION_CONTROLS.md": "82b7b27368f2ff419efd5af027f01ef33043508bfeb92494bac5d572da7ab9f4",
+    "handset-live.js": "3a687bdc265b3bc061e6c3e0356e7defc1b184fcb040e4c7ed79768aafdb0164",
+    "tests/test_handset_live_navigation.cjs": "f44b1a17dbc1f8f9a6062cfc34e0613c75a2302218f97e10c58f7dd79d2602e9",
+    "tools/apply_handset_5a4b.py": "efe419287c31e9251e8e1f178e394f76746ea10981b990eb7ce8f1e692e6fb60"
+  }
+}

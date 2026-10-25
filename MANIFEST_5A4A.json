@@ -1,0 +1,22 @@
+{
+  "milestone": "5A.4A intent/state Pause/Resume",
+  "replaces": {
+    "handset-live.js": "5f2afc2149184930c5737d43ffddbf0999736ae6",
+    "tests/test_handset_live_bridge.cjs": "6c3da31242bda6464173084461ca87b496fe6ba9"
+  },
+  "requires": {
+    "stream-source.js": "2ee9ebe129943721556c1094cfcc27839ee4ca56"
+  },
+  "required_files": [
+    "tools/handset_fenced_preview.py",
+    "tools/lcd_stream_fenced_api.py",
+    "assets/catalogue.json"
+  ],
+  "sha256": {
+    "CHECKPOINT_5A4A_PAUSE_RESUME.md": "978b0dbcd117ad9b5112b96b9f5c687233b40c6273e50e6e0af90dfe2ed984f4",
+    "handset-live.js": "4a44bb62d28e09dc436ce091273b0543a6d222d277087228da8ef166908ad044",
+    "tests/test_handset_live_bridge.cjs": "79533b6ec22ba06dd2b762251cbfeb1d21665d83761ff5feafdc32f8119d14fc",
+    "tests/test_handset_live_pause.cjs": "24d2bb66d1a6f2bc1791f7cbd6f304a3a91a5c2467a3f5656fe506bfc65ff2db",
+    "tools/apply_handset_5a4a.py": "5e962c943b888efe73f7387ad44938d0e7bb7474f1ee18958492e7e3e9c86b3c"
+  }
+}

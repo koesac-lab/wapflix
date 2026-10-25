@@ -1,0 +1,42 @@
+{
+  "milestone": "5A.4C visibility and terminal handling",
+  "replaces": {
+    "handset-live.js": "08052b7f860e2ea4a2b26201ede3dd053f355b6c",
+    "stream-source.js": "2ee9ebe129943721556c1094cfcc27839ee4ca56"
+  },
+  "required_files": [
+    "tests/test_handset_live_navigation.cjs",
+    "MANIFEST_5A4A.json",
+    "MANIFEST_5A4B.json",
+    "tools/handset_fenced_preview.py",
+    "tools/lcd_stream_fenced_api.py"
+  ],
+  "test_migrations": {
+    "tests/test_handset_live_bridge.cjs": {
+      "manifest": "MANIFEST_5A4A.json",
+      "edits": [
+        [
+          "for(const event of ['visibilitychange','pagehide'])test(event+' stops current session',async()=>{\n  const e=environment();await e.play();e.ctx.document.hidden=true;await e.fire(event);assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);\n});",
+          "for(const event of ['visibilitychange','pagehide'])test(event+' applies the current visibility/exit policy',async()=>{\n  const e=environment();await e.play();e.ctx.document.hidden=true;await e.fire(event);\n  if(event==='visibilitychange'){\n    assert.equal(e.adapter.stops,0);assert.equal(e.run('view'),'live-player');assert.equal(e.snapshot().state,'paused');assert.equal(e.timers.size,1);\n  }else{assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);}\n});"
+        ]
+      ]
+    },
+    "tests/test_handset_live_pause.cjs": {
+      "manifest": "MANIFEST_5A4A.json",
+      "edits": [
+        [
+          "for(const event of ['visibilitychange','pagehide'])test('5A.4A deliberately retains stop-on-'+event,async()=>{\n  const e=environment();await e.play();e.ctx.select();await flush();e.ctx.document.hidden=true;await e.fire(event);\n  assert.equal(e.run('view'),'details');assert.equal(e.adapter.stops,1);assert.equal(e.timers.size,0);\n});",
+          "for(const event of ['visibilitychange','pagehide'])test('5A.4C pauses on hide and stops on page exit: '+event,async()=>{\n  const e=environment();await e.play();e.ctx.select();await flush();e.ctx.document.hidden=true;await e.fire(event);\n  if(event==='visibilitychange'){\n    assert.equal(e.run('view'),'live-player');assert.equal(e.snapshot().state,'paused');assert.equal(e.adapter.stops,0);assert.equal(e.timers.size,1);\n  }else{assert.equal(e.run('view'),'details');assert.equal(e.adapter.stops,1);assert.equal(e.timers.size,0);}\n});"
+        ]
+      ]
+    }
+  },
+  "sha256": {
+    "CHECKPOINT_5A4C_VISIBILITY_TERMINAL.md": "b60ae0a952deba473a5f9ae4137dc647dcbd3de46c39cb81aed6f85db04f23d8",
+    "handset-live.js": "09cefbe073005a604c4f00843eaaddc6bfb95bd04dd45ad1ed8b0d7cc1f997fb",
+    "stream-source.js": "c03c839105545fe8c77d69bd868ff8db124b0c38ebbd4507168cd70fab105b4d",
+    "tests/test_handset_live_visibility.cjs": "be6c5998b64cbbd50fcc46fbfc86c7bd8f1d2500bcf79620634f8266228c19ad",
+    "tests/test_stream_source_terminal.cjs": "7d3db19b5c28af89de1927e5c30d3c892229ff182df72f2280919e48e75c793f",
+    "tools/apply_handset_5a4c.py": "7913be358a3f8860c5da0f587b74fbd7874be1648f094c1c2a91c4aa11a3f4ca"
+  }
+}

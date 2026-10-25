@@ -118,8 +118,10 @@ for(const reject of [false,true])test('stale poll '+(reject?'rejection':'reply')
 test('concurrent interval callbacks do not overlap bridge poll',async()=>{
   const e=environment();await e.play();const gate=deferred();e.adapter.pollGate=gate;const n=e.adapter.polls.length;e.poll();e.poll();e.poll();assert.equal(e.adapter.polls.length,n+1);gate.resolve({state:'running'});await flush();
 });
-test('Stop key 5 works during startup and buffering, never Pause',async()=>{
-  for(const mode of ['starting','buffering','playing']){const e=environment();if(mode==='starting')e.adapter.startGate=deferred();if(mode==='buffering')e.adapter.end=30;e.ctx.load(entry);await flush();assert.equal(e.snapshot().state,mode);e.ctx.key('5');assert.equal(e.run('view'),'details');assert.equal(e.adapter.stops,1);assert.equal(e.snapshot().state,'idle');}
+test('key 5 still cancels unacknowledged Start',async()=>{
+  const e=environment();e.adapter.startGate=deferred();e.ctx.load(entry);await flush();
+  assert.equal(e.snapshot().state,'starting');e.ctx.key('5');
+  assert.equal(e.run('view'),'details');assert.equal(e.adapter.stops,1);assert.equal(e.snapshot().state,'idle');
 });
 test('Stop cleanup failure is visible, not falsely confirmed',async()=>{
   const e=environment();await e.play();e.adapter.stopGate=deferred();e.ctx.back();assert.equal(e.run('view'),'details');assert.equal(e.snapshot().cleanupPending,true);e.adapter.stopGate.reject(Error('network lost'));await flush();assert.equal(e.snapshot().cleanupUnconfirmed,true);assert.match(e.elements.get('summary').textContent,/UNCONFIRMED/);
@@ -136,8 +138,11 @@ test('static switch is cancelled if cleanup fails',async()=>{
 test('Home delegates to original navigation rather than fake pagehide/window.page',async()=>{
   const e=environment();await e.play();e.ctx.key('*');assert.equal(e.run('view'),'home');assert.deepEqual(e.calls.key,['*']);assert.equal(e.adapter.stops,1);assert.equal(e.ctx.page,undefined);
 });
-for(const event of ['visibilitychange','pagehide'])test(event+' stops current session',async()=>{
-  const e=environment();await e.play();e.ctx.document.hidden=true;await e.fire(event);assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);
+for(const event of ['visibilitychange','pagehide'])test(event+' applies the current visibility/exit policy',async()=>{
+  const e=environment();await e.play();e.ctx.document.hidden=true;await e.fire(event);
+  if(event==='visibilitychange'){
+    assert.equal(e.adapter.stops,0);assert.equal(e.run('view'),'live-player');assert.equal(e.snapshot().state,'paused');assert.equal(e.timers.size,1);
+  }else{assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);}
 });
 test('unsupported numeric actions never reach static handlers; backlight still delegates',async()=>{
   const e=environment();await e.play();for(const k of ['0','1','2','3','4','6','7','8','9']){e.ctx.key(k);assert.match(e.elements.get('summary').textContent,/unavailable/);}assert.deepEqual(e.calls.key,[]);e.ctx.key('#');assert.deepEqual(e.calls.key,['#']);assert.equal(e.snapshot().state,'playing');
@@ -145,11 +150,13 @@ test('unsupported numeric actions never reach static handlers; backlight still d
 test('physical rocker/roller movement, wheel and keyboard arrows are navigation origins',async()=>{
   const e=environment();await e.play();for(const type of ['click','wheel']){const target={closest:selector=>selector==='.roller-press'?null:({classList:{contains:()=>false}})};const event=e.event(type,target);assert.equal(event.stopped,true);assert.match(e.elements.get('summary').textContent,/Navigation/);}const arrow=e.event('keydown',{}, {key:'ArrowUp'});assert.equal(arrow.stopped,true);assert.deepEqual(e.calls.key,[]);
 });
-test('roller press is Select/Stop, never interpreted as movement',async()=>{
-  const e=environment();await e.play();const press={classList:{contains:c=>c==='roller-press'}};e.event('click',{closest:()=>press});assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');
+test('roller press is Select/Pause, never interpreted as movement',async()=>{
+  const e=environment();await e.play();const press={classList:{contains:c=>c==='roller-press'}};
+  e.event('click',{closest:()=>press});assert.equal(e.adapter.stops,0);
+  assert.equal(e.run('view'),'live-player');assert.equal(e.snapshot().state,'paused');
 });
 test('pixels are cleared for every decoded frame; LCD scene is 200px high',async()=>{
-  const e=environment();await e.play();e.raf(1000);e.adapter.hex='00';e.raf(1137);const pixelLog=e.contexts[1].log;const lastClear=pixelLog.map(x=>x[0]).lastIndexOf('clearRect');assert.ok(lastClear>=0);assert.equal(pixelLog.slice(lastClear+1).filter(x=>x[0]==='fillRect').length,0);const draw=e.elements.get('display').context.log.filter(x=>x[0]==='drawImage').at(-1);assert.ok(draw[3]+draw[5]<=200);assert.equal(e.elements.get('left').attrs['aria-label'],'STOP');assert.equal(e.elements.get('back').attrs['aria-label'],'BACK');
+  const e=environment();await e.play();e.raf(1000);e.adapter.hex='00';e.raf(1137);const pixelLog=e.contexts[1].log;const lastClear=pixelLog.map(x=>x[0]).lastIndexOf('clearRect');assert.ok(lastClear>=0);assert.equal(pixelLog.slice(lastClear+1).filter(x=>x[0]==='fillRect').length,0);const draw=e.elements.get('display').context.log.filter(x=>x[0]==='drawImage').at(-1);assert.ok(draw[3]+draw[5]<=200);assert.equal(e.elements.get('left').attrs['aria-label'],'PAUSE');assert.equal(e.elements.get('back').attrs['aria-label'],'BACK');
 });
 test('transport timeout stays distinct; error has usable Back and no leaked timer',async()=>{
   const e=environment();await e.play();e.adapter.error=Object.assign(Error('deadline'),{name:'TimeoutError'});await e.poll();assert.equal(e.snapshot().state,'error');assert.match(e.elements.get('summary').textContent,/TRANSPORT TIMEOUT/);assert.equal(e.timers.size,0);e.ctx.back();assert.equal(e.run('view'),'details');
