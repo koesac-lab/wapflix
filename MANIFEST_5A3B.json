@@ -1,0 +1,30 @@
+{
+  "milestone": "5A.3B bridge recovery",
+  "replaces": {
+    "handset-live.js": "d03114c51f460137e8b0004cf16e6bc6f7b9890d",
+    "tools/handset_fenced_preview.py": "b70ab8878e0ddb2d54c4b1253a1d9e46bf39e884",
+    "tests/test_handset_live_bridge.cjs": "ac9c16dc50955957a48a3a5b456607749962da9f"
+  },
+  "requires": {
+    "index.html": "068d6d66116044346e1abb87d703b90428aa2d41",
+    "player.js": "d6f971a2b7487d286e0264a7b74a64ec3206a0ba",
+    "streaming.js": "01aef733a4dbdf716f42f3f678b20427320b51d7",
+    "theme.js": "86e0568544ff36126f8f40d7a3399911d8ac467c",
+    "sharing.js": "7d0af33e15ff0fa9625e43b2352ed6e3b8ce93fd",
+    "stream-source.js": "2ee9ebe129943721556c1094cfcc27839ee4ca56",
+    "tools/handset_static_preview.py": "2b1d146dffa5c562a98cc2feccebd775eb260d01"
+  },
+  "required_files": [
+    "tools/lcd_stream_fenced_api.py",
+    "tools/lcd_m4_factory.py",
+    "assets/catalogue.json"
+  ],
+  "sha256": {
+    "CHECKPOINT_5A3B_BRIDGE_RECOVERY.md": "578fda52160217f2092e0e1e0f470a9cb5c0ce2fd5df5252499908f480234f5f",
+    "handset-live.js": "52e83cef0c10dc3e164b52c6a6952b501c0b0c9522c54bb23700ab76ca43f4cd",
+    "tests/test_handset_live_bridge.cjs": "5ff5f883214494323301b3f5a6abfc0d37b1495fe5c6adc3203d4d30d73751e5",
+    "tests/test_handset_live_publication.py": "f77ab821cbff780cbb32eb392d7d15f4673412c89c1049853829f118ec36f12c",
+    "tools/apply_handset_5a3b.py": "5a985a5e8cb0e950768f79cc66edec00549f52991fde9759c848179b2fdb09cf",
+    "tools/handset_fenced_preview.py": "923b209de8bd66e9250457e690a2ee7ffab37574f586521310ce51f5b99106eb"
+  }
+}

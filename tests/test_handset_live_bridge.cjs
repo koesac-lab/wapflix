@@ -1,508 +1,174 @@
-// 5A.3B focused bridge state/timing tests for handset-live.js.
-//
-// The bridge is loaded against a mock DOM/window so its state machine, clock,
-// presented-frame selection, single animation chain, single poll timer, stale
-// callback rejection and static delegation can be asserted without a browser.
-// Mock/state tests are NOT a real-browser result.
+// 5A.3B deterministic lifecycle/render/clock tests. Not browser acceptance.
+const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-
-const tests = [];
-const test = (name, fn) => tests.push({ name, fn });
-
-const SOURCE = fs.readFileSync(path.join(__dirname, '..', 'handset-live.js'), 'utf8');
-
-// ---------------------------------------------------------------- mock DOM
-function makeCtx() {
-  const calls = [];
-  const ctx = {
-    calls,
-    fillStyle: '', strokeStyle: '', lineWidth: 1, imageSmoothingEnabled: true,
-    clearRect: (...a) => calls.push(['clearRect', ...a]),
-    fillRect: (...a) => calls.push(['fillRect', ...a]),
-    strokeRect: (...a) => calls.push(['strokeRect', ...a]),
-    drawImage: (...a) => calls.push(['drawImage', ...a]),
-    save: () => calls.push(['save']), restore: () => calls.push(['restore']),
+const source = fs.readFileSync(path.join(__dirname, '..', 'handset-live.js'), 'utf8');
+const entry = {id:'local-stream-test', playback_type:'local-stream'};
+const deferred = () => { let resolve, reject; const promise = new Promise((a,b)=>{resolve=a;reject=b;}); return {promise,resolve,reject}; };
+const flush = async () => { for(let n=0;n<12;n++) await Promise.resolve(); };
+function environment(config = {token:'test-only',apiBase:'/'}) {
+  const elements = new Map(), listeners = new Map(), queue = [], timers = new Map();
+  let id=0, now=0, instance;
+  const calls = {load:0, select:0, back:0, key:[], render:0, paint:0, staticTick:0, writes:0};
+  const contexts=[];
+  function context() {
+    const log=[]; const c={log};
+    for(const key of ['clearRect','fillRect','drawImage','strokeRect']) c[key]=(...args)=>log.push([key,...args]);
+    contexts.push(c); return c;
+  }
+  function element(name) {
+    const attrs={}; const c=context();
+    return {id:name,width:0,height:0,attrs,context:c,textContent:'',getContext:()=>c,
+      setAttribute:(k,v)=>attrs[k]=v, getAttribute:k=>attrs[k],
+      closest:()=>null,classList:{contains:()=>false}};
+  }
+  const get=name=>{if(!elements.has(name))elements.set(name,element(name));return elements.get(name);};
+  function listen(type,fn,opts){const key=(opts===true||opts?.capture?'capture:':'')+type;if(!listeners.has(key))listeners.set(key,[]);listeners.get(key).push(fn);}
+  const meta={id:'stream',navigation_id:'nav',cols:8,rows:1,fps:8,chunk_frames:16,source_start:30,range_start:30,range_end:90};
+  class Source {
+    constructor(){instance=this;this.starts=0;this.stops=0;this.polls=[];this.end=34;this.complete=false;this.total=480;this.hex='80';this.meta=null;this.error=null;}
+    async start(){this.starts++;const data=this.startGate?await this.startGate.promise:meta;this.meta=this.rangeEnd?{...data,range_end:this.rangeEnd}:data;return this.meta;}
+    stop(){this.stops++;this.meta=null;return this.stopGate?.promise || Promise.resolve(true);}
+    async poll(options){this.polls.push(options);if(this.pollGate)return this.pollGate.promise;
+      if(this.error)throw this.error;
+      return {state:this.complete?'complete':'running',total_frames:this.complete?this.total:null};}
+    frameAt(at){if(!this.meta||at>=this.end-1e-8)return null;const n=Math.min(this.complete?this.total-1:99999,Math.max(0,Math.floor((at-30)*8+1e-7)));return {hex:this.hex,cols:8,rows:1,fps:8,sourceTime:30+n/8,frameIndex:n};}
+    bufferedUntil(){return this.end;}
+  }
+  const sandbox={console,window:null,document:{hidden:false,getElementById:get,createElement:element,addEventListener:listen},
+    wapflixLiveConfig:config,WapflixStreamSource:Source,requestAnimationFrame:fn=>{queue.push(fn);return ++id;},
+    setInterval:(fn,ms)=>{const n=++id;timers.set(n,{fn,ms});return n;},clearInterval:n=>timers.delete(n),
+    addEventListener:listen,localStorage:{setItem:()=>calls.writes++,removeItem:()=>calls.writes++},
+    performance:{now:()=>now}, calls};
+  sandbox.window=sandbox;
+  const ctx=vm.createContext(sandbox);
+  // These are lexical globals, NOT window.view/window.token.
+  vm.runInContext(`
+    const $=id=>document.getElementById(id),ctx=$('display').getContext('2d'),ink='#25371e';
+    let view='details',item=null,clip=null,message='',detail=false,playing=false,last=0,frame=-1,token=7;
+    function text(s,x,y){ctx.fillRect(x,y,String(s).length,1);}
+    function center(s,y){text(s,0,y);} function wrap(s){return [s];}
+    function announce(s){$('summary').textContent=s;}
+    function setPlaying(value){playing=value;last=0;}
+    function render(){calls.render++;} function paint(){calls.paint++;}
+    function load(e){calls.load++;item=e;view='player';clip={frames:['static']};return Promise.resolve();}
+    function select(){calls.select++;} function back(){calls.back++;view='home';}
+    function key(v){calls.key.push(v);if(v==='*'){view='home';clip=null;}if(v==='#')render();}
+    function tick(t){calls.staticTick++;requestAnimationFrame(tick);}
+    requestAnimationFrame(tick);
+  `,ctx);
+  vm.runInContext(source,ctx,{filename:'handset-live.js'});
+  queue.shift()(0); // The queued bootstrap callback hands off to the new global tick.
+  const run=s=>vm.runInContext(s,ctx);
+  return {run,calls,queue,timers,elements,contexts,ctx,listeners,
+    get adapter(){return instance;}, snapshot:()=>sandbox.wapflixLive?.snapshot(),
+    async play(){ctx.load(entry);await flush();},
+    async poll(){for(const t of [...timers.values()])t.fn();await flush();},
+    raf(t){now=t;const pending=queue.splice(0);for(const fn of pending)fn(t);assert.equal(queue.length,1,'exactly one successor callback');},
+    event(type,target={},extra={}){const event={type,target:{closest:()=>null,...target},preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;},...extra};for(const fn of listeners.get('capture:'+type)||[])fn(event);return event;},
+    async fire(type){for(const fn of listeners.get(type)||[])fn();await flush();}
   };
-  return ctx;
-}
-function makeElement(id) {
-  const attrs = {};
-  return {
-    id, attrs, textContent: '', innerHTML: '',
-    width: 0, height: 0,
-    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-    setAttribute(k, v) { attrs[k] = v; },
-    getAttribute(k) { return attrs[k]; },
-    querySelector: () => makeElement('sub'),
-    querySelectorAll: () => [],
-    appendChild() {}, remove() {}, addEventListener() {},
-    getContext: () => makeCtx(),
-    onclick: null,
-  };
-}
-
-function buildEnv(options = {}) {
-  const elements = new Map();
-  const getEl = (id) => {
-    if (!elements.has(id)) elements.set(id, makeElement(id));
-    return elements.get(id);
-  };
-  const display = makeElement('display');
-  elements.set('display', display);
-
-  const rafQueue = [];
-  const timers = new Map();
-  let nextTimer = 1;
-  let rafId = 0;
-  const summary = { textContent: '' };
-
-  const win = {
-    wapflixLiveConfig: options.config === null ? undefined : Object.assign({
-      entryId: 'local-stream-test',
-      sourceIdentity: 'configured-test',
-      token: 'capability-token',
-      apiBase: '/',
-    }, options.config || {}),
-    location: { href: 'http://127.0.0.1:8103/' },
-    fetch: options.fetch || (async () => { throw Error('unexpected fetch'); }),
-    performance: { now: () => nowMs },
-    requestAnimationFrame: (fn) => { rafQueue.push(fn); return ++rafId; },
-    addEventListener(type, fn) { (win._listeners[type] ||= []).push(fn); },
-    _listeners: {},
-    setTimeout: (fn, ms) => { const id = nextTimer++; timers.set(id, { fn, ms, interval: null }); return id; },
-    clearTimeout: (id) => timers.delete(id),
-    setInterval: (fn, ms) => { const id = nextTimer++; timers.set(id, { fn, ms, interval: ms }); return id; },
-    clearInterval: (id) => timers.delete(id),
-    localStorage: {
-      _data: {},
-      getItem(k) { return this._data[k] ?? null; },
-      setItem(k, v) { this._data[k] = String(v); },
-      removeItem(k) { delete this._data[k]; },
-    },
-    document: {
-      createElement: makeElement,
-      getElementById: (id) => (id === 'summary' ? summary : getEl(id)),
-      querySelector: () => makeElement('sub'),
-      querySelectorAll: () => [],
-      hidden: false,
-    },
-  };
-  win.window = win;
-  win.document = {
-    createElement: makeElement,
-    hidden: false,
-    getElementById: (id) => (id === 'summary' ? summary : getEl(id)),
-    querySelector: () => makeElement('x'),
-    querySelectorAll: () => [],
-    addEventListener(type, fn) { (win._listeners['doc:' + type] ||= []).push(fn); },
-  };
-  win.globalThis = win;
-  let nowMs = 0;
-  const env = {
-    win, elements, summary, display,
-    get now() { return nowMs; },
-    set now(v) { nowMs = v; },
-    rafQueue, timers,
-    runRaf(time) {
-      const pending = rafQueue.splice(0, rafQueue.length);
-      nowMs = time;
-      for (const fn of pending) fn(time);
-      return pending.length;
-    },
-    runTimers() {
-      const entries = [...timers.entries()];
-      for (const [id, t] of entries) { if (t.interval !== null) t.fn(); }
-    },
-    fire(type, event) {
-      for (const fn of win._listeners[type] || []) fn(event || { type });
-    },
-    // Original static player functions that the bridge must delegate to.
-    calls: { load: 0, select: 0, back: 0, key: 0, tick: 0, render: 0, paint: 0 },
-  };
-
-  const ctxObj = vm.createContext(win);
-  ctxObj.globalThis = ctxObj;
-  ctxObj.performance = win.performance;
-  ctxObj.requestAnimationFrame = win.requestAnimationFrame;
-  ctxObj.setTimeout = win.setTimeout;
-  ctxObj.clearTimeout = win.clearTimeout;
-  ctxObj.setInterval = win.setInterval;
-  ctxObj.clearInterval = win.clearInterval;
-  ctxObj.document = win.document;
-  ctxObj.localStorage = win.localStorage;
-  ctxObj.console = console;
-
-  // Provide the globals streaming.js would have defined.
-  ctxObj.load = function (...a) { env.calls.load++; env.lastLoad = a; };
-  ctxObj.select = function () { env.calls.select++; };
-  ctxObj.back = function () { env.calls.back++; };
-  ctxObj.key = function (v) { env.calls.key++; env.lastKey = v; };
-  ctxObj.tick = function (t) { env.calls.tick++; ctxObj.requestAnimationFrame(ctxObj.tick); };
-  ctxObj.render = function () { env.calls.render++; };
-  ctxObj.paint = function () { env.calls.paint++; };
-  ctxObj.say = function () {};
-  ctxObj.view = 'details';
-  ctxObj.item = null;
-  ctxObj.clip = null;
-  ctxObj.message = '';
-  ctxObj.detail = false;
-  ctxObj.playing = false;
-  ctxObj.elapsed = 0;
-  ctxObj.last = 0;
-  ctxObj.frame = -1;
-  ctxObj.token = 0;
-  ctxObj.history = [];
-  ctxObj.page = { name: 'details', selected: 0 };
-  env.ctx = ctxObj;
-
-  // Mock adapter installed before the bridge runs.
-  ctxObj.WapflixStreamSource = options.SourceClass || MockSource;
-  vm.runInContext(SOURCE, ctxObj, { filename: 'handset-live.js' });
-  env.run = (src) => vm.runInContext(src, ctxObj);
-  return env;
 }
 
-// ------------------------------------------------------------ mock adapter
-class MockSource {
-  constructor({ token, baseUrl }) {
-    if (typeof token !== 'string' || !token) throw Error('A server capability token is required');
-    this.token = token; this.baseUrl = baseUrl;
-    this.state = 'idle';
-    this.metadata = null;
-    this.status = null;
-    this._fps = 8;
-    this.chunks = new Map();
-    this.polls = [];
-    this.starts = 0;
-    this.stops = 0;
-    this.startDelay = 0;
-    this.failStart = null;
-    this.totalFrames = null;
-    this.generated = 0;
-    this.onPoll = null;
-    this._generation = 0;
-  }
-  _invalidate(state) {
-    ++this._generation;
-    this.metadata = null;
-    this.status = null;
-    this.chunks.clear();
-    this.state = state;
-    this.error = null;
-    return this._generation;
-  }
-  async start() {
-    this.starts++;
-    if (this.startDelay) await new Promise(r => setTimeout(r, this.startDelay));
-    if (this.failStart) throw this.failStart;
-    this.state = 'ready';
-    this.metadata = {
-      id: 's1', navigation_id: 'n1', cols: 240, rows: 135, fps: 8, chunk_frames: 16,
-      source_start: 30, range_start: 30, range_end: 90,
-    };
-    return this.metadata;
-  }
-  async stop() { this.stops++; this.state = 'stopped'; return true; }
-  async poll({ sourceTime = 30, paused = false } = {}) {
-    this.polls.push({ sourceTime, paused });
-    if (this.onPoll) return this.onPoll({ sourceTime, paused });
-    this.status = {
-      id: 's1', state: 'running', ready_frames: 1000, generated_chunks: 20,
-      total_frames: this.totalFrames, source_start: 30,
-    };
-    return this.status;
-  }
-  frameAt(sourceTime) {
-    if (!this.metadata) return null;
-    const m = this.metadata;
-    const n = Math.max(0, Math.floor((sourceTime - m.source_start) * m.fps));
-    if (this.totalFrames != null && n > this.totalFrames - 1) return null;
-    return { hex: '80' + '00'.repeat(4049), cols: m.cols, rows: m.rows, fps: m.fps, frameIndex: n, sourceTime: m.source_start + n / m.fps };
-  }
-  bufferedUntil(sourceTime = 30) {
-    if (!this.metadata) return null;
-    return Math.min(sourceTime + 2, this.metadata.range_end);
-  }
-}
-
-// --------------------------------------------------------------- test cases
-
-test('bridge does not touch static playback when no live entry is selected', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'test-video' }, false, {});
-  assert.equal(env.calls.load, 1);
-  assert.equal(env.ctx.view, 'details');
-  assert.equal(env.ctx.clip, null);
+test('static path and absent capability remain inert',async()=>{
+  for(const cfg of [undefined,null]){const e=environment(cfg===undefined?{token:'x'}:null);e.ctx.load({id:'static'});await flush();assert.equal(e.calls.load,1);assert.equal(e.run('view'),'player');}
+  const e=environment(null);e.ctx.load(entry);assert.equal(e.calls.load,1);assert.equal(e.adapter,undefined);
 });
-
-test('live entry is recognised by exact id, not by substring', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test-extra' }, false, {});
-  assert.equal(env.calls.load, 1, 'a near-miss id must stay on the static path');
-  env.ctx.load({ id: 'local-stream' }, false, {});
-  assert.equal(env.calls.load, 2, 'a partial id must stay on the static path');
+test('recognition needs exact ID and explicit playback type',()=>{
+  const e=environment();e.ctx.load({id:'local-stream-test-extra',playback_type:'local-stream'});e.ctx.load({id:'local-stream-test'});assert.equal(e.calls.load,2);
 });
-
-test('live play does not call the static load path and keeps clip unset', () => {
-  const env = buildEnv();
-  env.ctx.item = { id: 'local-stream-test' };
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  assert.equal(env.calls.load, 0, 'static load must not run for the live entry');
-  assert.equal(env.ctx.clip, null, 'live playback must not impersonate a static clip');
+test('uses lexical handset state, keeps clip null, invalidates static token',async()=>{
+  const e=environment();await e.play();assert.equal(e.run('view'),'live-player');assert.equal(e.ctx.view,undefined);assert.equal(e.run('clip'),null);assert.equal(e.run('playing'),false);assert.equal(e.run('token'),8);assert.equal(e.calls.load,0);assert.equal(e.calls.writes,0);
 });
-
-test('live entry never writes static resume or completion records', () => {
-  const env = buildEnv();
-  env.ctx.item = { id: 'local-stream-test' };
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  assert.equal(env.ctx.localStorage.getItem('wapflix-state-v1'), null);
-  assert.equal(env.ctx.localStorage.getItem('wapflix-static-resume'), null);
+test('one pre-existing animation chain and one 250ms timer across repeated Play',async()=>{
+  const e=environment();await e.play();await e.play();await e.play();assert.equal(e.adapter.starts,1);assert.equal(e.timers.size,1);assert.equal([...e.timers.values()][0].ms,250);assert.equal(e.queue.length,1);e.raf(1000);e.raf(1137);assert.equal(e.calls.staticTick,1);assert.equal(e.queue.length,1);
 });
-
-test('selecting the live entry does not persist progress for that id', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  const stored = env.ctx.localStorage.getItem('wapflix-state-v1');
-  assert.ok(!stored || !stored.includes('local-stream-test'));
+test('smooth clock and presented frame time stay distinct',async()=>{
+  const e=environment();await e.play();e.raf(1000);e.raf(1137);assert.ok(Math.abs(e.snapshot().position-.137)<1e-8);assert.equal(e.snapshot().presentedSourceTime,30.125);assert.equal(e.snapshot().presentedFrameIndex,1);
 });
-
-test('the bridge exposes exactly one animation chain', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  // Drain the pending microtask queue so the async start resolves.
-  return new Promise(resolve => setImmediate(() => {
-    const before = env.rafQueue.length;
-    env.runRaf(1000);
-    // After one frame the bridge must have queued exactly one successor.
-    assert.equal(env.rafQueue.length, 1, 'one rAF chain must remain');
-    assert.ok(before >= 0);
-    resolve();
-  }));
+test('four second startup target actually gates presentation',async()=>{
+  const e=environment();e.adapter.end=32;await e.play();assert.equal(e.snapshot().state,'buffering');e.raf(1000);e.raf(9000);assert.equal(e.snapshot().position,0);e.adapter.end=34;await e.poll();assert.equal(e.snapshot().state,'playing');e.raf(10000);assert.equal(e.snapshot().position,0);
 });
-
-test('the static tick is not chained alongside the live tick', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.runRaf(1000);
-    assert.equal(env.calls.tick, 0, 'the static tick must not run during live playback');
-    resolve();
-  }));
+test('startup short-complete exception includes a one-frame extract',async()=>{
+  const e=environment();e.adapter.complete=true;e.adapter.total=1;e.adapter.end=30.125;await e.play();assert.equal(e.snapshot().state,'playing');e.raf(1000);e.raf(1125);assert.equal(e.snapshot().state,'ended');assert.equal(e.snapshot().presentedFrameIndex,0);assert.equal(e.timers.size,0);await flush();assert.equal(e.adapter.stops,1);
 });
-
-test('the bridge uses one poll timer and clears it on exit', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    const intervals = [...env.timers.values()].filter(t => t.interval !== null);
-    assert.equal(intervals.length, 1, 'exactly one heartbeat/prefetch timer');
-    assert.equal(intervals[0].ms, 250, 'established 250ms cadence');
-    env.ctx.back();
-    setImmediate(() => {
-      const after = [...env.timers.values()].filter(t => t.interval !== null);
-      assert.equal(after.length, 0, 'the timer must be cleared on exit');
-      resolve();
-    });
-  }));
+test('underflow freezes smooth position, image, and keeps polling',async()=>{
+  const e=environment();await e.play();e.raf(1000);e.raf(1100);const before=e.snapshot();e.adapter.end=30.2;e.raf(1500);assert.equal(e.snapshot().state,'buffering');assert.equal(e.snapshot().position,before.position);assert.equal(e.snapshot().presentedSourceTime,before.presentedSourceTime);assert.equal(e.timers.size,1);const n=e.adapter.polls.length;await e.poll();assert.equal(e.adapter.polls.length,n+1);e.raf(9000);assert.equal(e.snapshot().position,before.position);
 });
-
-test('repeated play does not accumulate timers', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.ctx.load({ id: 'local-stream-test' }, false, {});
-    env.ctx.load({ id: 'local-stream-test' }, false, {});
-    setImmediate(() => {
-      const intervals = [...env.timers.values()].filter(t => t.interval !== null);
-      assert.ok(intervals.length <= 1, 'repeated Play must not accumulate intervals');
-      resolve();
-    });
-  }));
+test('rebuffer recovery needs one chunk and resets wall-clock reference',async()=>{
+  const e=environment();await e.play();e.raf(1000);e.raf(1100);e.adapter.end=30.2;e.raf(1500);e.adapter.end=31;await e.poll();assert.equal(e.snapshot().state,'buffering');e.adapter.end=32.2;await e.poll();assert.equal(e.snapshot().state,'playing');e.raf(9000);assert.ok(Math.abs(e.snapshot().position-.1)<1e-8);e.raf(9137);assert.ok(Math.abs(e.snapshot().position-.237)<1e-8);
 });
-
-test('the bridge holds the picture and keeps polling on underflow', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    const source = env.ctx.WapflixStreamSource;
-    // Simulate a frame that is not yet available.
-    const original = source.prototype.frameAt;
-    source.prototype.frameAt = function () { return null; };
-    const before = env.ctx.elapsed;
-    env.runRaf(1000);
-    env.runTimers();
-    assert.equal(env.ctx.elapsed, before, 'position must be held during underflow');
-    source.prototype.frameAt = original;
-    resolve();
-  }));
+for(const tailFrames of [1,5])test('completed rebuffer tail of '+tailFrames+' frame(s) drains to final frame',async()=>{
+  const e=environment();await e.play();e.raf(1000);e.raf(2000);e.adapter.end=31.01;e.raf(3000);assert.equal(e.snapshot().state,'buffering');e.adapter.complete=true;e.adapter.total=8+tailFrames;e.adapter.end=30+e.adapter.total/8;await e.poll();assert.equal(e.snapshot().state,'playing');e.raf(5000);e.raf(6000);assert.equal(e.snapshot().state,'ended');assert.equal(e.snapshot().presentedFrameIndex,e.adapter.total-1);assert.equal(e.snapshot().position,e.adapter.total/8);assert.equal(e.timers.size,0);
 });
-
-test('the smooth clock is not re-quantised to frame boundaries', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    // Advance the clock by 137ms: not a multiple of the 125ms frame period.
-    env.runRaf(1000);
-    env.runRaf(1137);
-    const bridgeState = env.ctx.__bridgeState;
-    resolve();
-  }));
+test('conversion complete does not end playback early',async()=>{
+  const e=environment();e.adapter.complete=true;e.adapter.total=48;e.adapter.end=36;await e.play();assert.equal(e.snapshot().state,'playing');e.raf(1000);e.raf(2000);assert.equal(e.snapshot().state,'playing');assert.equal(e.snapshot().position,1);assert.equal(e.adapter.stops,0);
 });
-
-test('presented source time is the quantised frame time, not the smooth clock', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.runRaf(1000);
-    env.runRaf(1137);
-    // 137ms into an 8fps stream is frame 1 (125ms), source time 30.125.
-    const adapter = env.ctx.__adapter;
-    resolve();
-  }));
+test('Back during pending Start stops immediately and rejects late acknowledgement',async()=>{
+  const e=environment();const gate=deferred();e.adapter.startGate=gate;e.ctx.load(entry);assert.equal(e.snapshot().state,'starting');e.ctx.back();assert.equal(e.run('view'),'details');assert.equal(e.adapter.stops,1);gate.resolve({source_start:30,range_end:90});await flush();assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);assert.equal(e.snapshot().state,'idle');
 });
-
-test('back during startup leaves immediately and late responses do not reopen live', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  env.ctx.back();
-  return new Promise(resolve => setImmediate(() => {
-    assert.notEqual(env.ctx.view, 'live-player');
-    resolve();
-  }));
+test('stale Start rejection cannot replace navigation with error',async()=>{
+  const e=environment();const gate=deferred();e.adapter.startGate=gate;e.ctx.load(entry);e.ctx.back();gate.reject(Error('late error'));await flush();assert.equal(e.snapshot().state,'idle');assert.equal(e.run('view'),'details');
 });
-
-test('a stale poll response after stop cannot resurrect the live view', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.ctx.back();
-    env.runRaf(2000);
-    env.runTimers();
-    assert.notEqual(env.ctx.view, 'live-player');
-    assert.equal(env.ctx.clip, null);
-    resolve();
-  }));
+for(const reject of [false,true])test('stale poll '+(reject?'rejection':'reply')+' cannot resurrect after exit',async()=>{
+  const e=environment();await e.play();const gate=deferred();e.adapter.pollGate=gate;const polling=e.poll();e.ctx.back();reject?gate.reject(Error('late')):gate.resolve({state:'complete',total_frames:1});await polling;await flush();assert.equal(e.run('view'),'details');assert.equal(e.snapshot().state,'idle');assert.equal(e.timers.size,0);e.raf(8000);assert.equal(e.calls.staticTick,2);
 });
-
-test('live to static invalidates callbacks and delegates to the static path', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.ctx.back();
-    setImmediate(() => {
-      const before = env.calls.load;
-      env.ctx.load({ id: 'test-video' }, false, {});
-      assert.equal(env.calls.load, before + 1, 'static playback must resume normally');
-      resolve();
-    });
-  }));
+test('concurrent interval callbacks do not overlap bridge poll',async()=>{
+  const e=environment();await e.play();const gate=deferred();e.adapter.pollGate=gate;const n=e.adapter.polls.length;e.poll();e.poll();e.poll();assert.equal(e.adapter.polls.length,n+1);gate.resolve({state:'running'});await flush();
 });
-
-test('static to live invalidates the numeric static-load token', () => {
-  const env = buildEnv();
-  env.ctx.token = 7;
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    assert.ok(env.ctx.token > 7, 'the static-load token must be invalidated');
-    resolve();
-  }));
+test('Stop key 5 works during startup and buffering, never Pause',async()=>{
+  for(const mode of ['starting','buffering','playing']){const e=environment();if(mode==='starting')e.adapter.startGate=deferred();if(mode==='buffering')e.adapter.end=30;e.ctx.load(entry);await flush();assert.equal(e.snapshot().state,mode);e.ctx.key('5');assert.equal(e.run('view'),'details');assert.equal(e.adapter.stops,1);assert.equal(e.snapshot().state,'idle');}
 });
-
-test('unsupported live actions are announced honestly, not silently substituted', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    for (const [key, expected] of [['0', 'Quality'], ['2', 'Caption'], ['4', 'Seek'], ['6', 'Seek'], ['7', 'LCD/ASCII']]) {
-      env.summary.textContent = '';
-      env.ctx.key(key);
-      assert.match(env.summary.textContent, new RegExp(expected), `key ${key}`);
-      assert.match(env.summary.textContent, /unavailable/i, `key ${key}`);
-    }
-    resolve();
-  }));
+test('Stop cleanup failure is visible, not falsely confirmed',async()=>{
+  const e=environment();await e.play();e.adapter.stopGate=deferred();e.ctx.back();assert.equal(e.run('view'),'details');assert.equal(e.snapshot().cleanupPending,true);e.adapter.stopGate.reject(Error('network lost'));await flush();assert.equal(e.snapshot().cleanupUnconfirmed,true);assert.match(e.elements.get('summary').textContent,/UNCONFIRMED/);
 });
-
-test('the live footer advertises STOP and BACK while playing', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.runRaf(1000);
-    env.runTimers();
-    env.runRaf(1000);
-    const left = env.elements.get('left')?.getAttribute?.('aria-label');
-    assert.ok(left === 'STOP' || left === 'PAUSE' || left === 'BUFFERING' || left === 'CONNECT',
-      `unexpected live footer label: ${left}`);
-    resolve();
-  }));
+test('static switch waits for cleanup then delegates, preserving return state',async()=>{
+  const e=environment();await e.play();e.adapter.stopGate=deferred();const switching=e.ctx.load({id:'static'});assert.equal(e.calls.load,0);e.adapter.stopGate.resolve(true);await switching;assert.equal(e.calls.load,1);assert.equal(e.run('view'),'player');assert.equal(e.snapshot().pollTimer,false);
 });
-
-test('a failing start surfaces an error state instead of a silent hang', () => {
-  const env = buildEnv();
-  env.ctx.WapflixStreamSource = class extends MockSource {
-    async start() { throw Error('HTTP 503'); }
-  };
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    assert.notEqual(env.ctx.view, 'live-player');
-    resolve();
-  }));
+test('old delayed static switch cannot overwrite a newer load',async()=>{
+  const e=environment();await e.play();e.adapter.stopGate=deferred();const switching=e.ctx.load({id:'old'});e.ctx.load({id:'new'});e.adapter.stopGate.resolve(true);await switching;assert.equal(e.calls.load,1);assert.equal(e.run('item.id'),'new');
 });
-
-test('hiding the page stops live playback', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.win.document.hidden = true;
-    env.fire('visibilitychange', { type: 'visibilitychange' });
-    setImmediate(() => {
-      const intervals = [...env.timers.values()].filter(t => t.interval !== null);
-      assert.equal(intervals.length, 0, 'hidden page must not keep the heartbeat running');
-      resolve();
-    });
-  }));
+test('static switch is cancelled if cleanup fails',async()=>{
+  const e=environment();await e.play();e.adapter.stopGate=deferred();const switching=e.ctx.load({id:'static'});e.adapter.stopGate.reject(Error('failed'));await switching;assert.equal(e.calls.load,0);assert.match(e.elements.get('summary').textContent,/cancelled/);
 });
-
-test('the bridge is inert without a capability token', () => {
-  const env = buildEnv({ config: null });
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  assert.equal(env.calls.load, 1, 'without a capability the static path is used unchanged');
+test('Home delegates to original navigation rather than fake pagehide/window.page',async()=>{
+  const e=environment();await e.play();e.ctx.key('*');assert.equal(e.run('view'),'home');assert.deepEqual(e.calls.key,['*']);assert.equal(e.adapter.stops,1);assert.equal(e.ctx.page,undefined);
 });
-
-test('press 5 during playing pauses; press 5 again resumes', () => {
-  const env = buildEnv();
-  env.ctx.load({ id: 'local-stream-test' }, false, {});
-  return new Promise(resolve => setImmediate(() => {
-    env.runRaf(1000);
-    env.runTimers();   // poll tick fires → state = playing
-    setImmediate(() => { // drain the async poll microtask
-      env.runRaf(2000);  // now framed=true, footer shows STOP
-      const before = env.elements.get('left').getAttribute('aria-label');
-      assert.ok(before === 'STOP', `expected STOP before pause, got: ${before}`);
-      // First 5 press: pause (from playing → paused)
-      env.ctx.key('5');
-      setImmediate(() => {
-        const left = env.elements.get('left').getAttribute('aria-label');
-        assert.ok(left === 'PAUSE', `expected PAUSE after pause, got: ${left}`);
-        // Second 5 press: resume (from paused → playing)
-        env.ctx.key('5');
-        setImmediate(() => {
-          const left = env.elements.get('left').getAttribute('aria-label');
-          assert.ok(left === 'STOP', `expected STOP after resume, got: ${left}`);
-          resolve();
-        });
-      });
-    });
-  }));
+for(const event of ['visibilitychange','pagehide'])test(event+' stops current session',async()=>{
+  const e=environment();await e.play();e.ctx.document.hidden=true;await e.fire(event);assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');assert.equal(e.timers.size,0);
 });
-
-(async () => {
-  let failed = 0;
-  for (const { name, fn } of tests) {
-    try { await fn(); console.log('PASS ' + name); }
-    catch (error) { failed++; console.error('FAIL ' + name + '\n' + error.stack); }
-  }
-  if (failed) process.exitCode = 1; else console.log(tests.length + ' bridge tests passed.');
-})();
+test('unsupported numeric actions never reach static handlers; backlight still delegates',async()=>{
+  const e=environment();await e.play();for(const k of ['0','1','2','3','4','6','7','8','9']){e.ctx.key(k);assert.match(e.elements.get('summary').textContent,/unavailable/);}assert.deepEqual(e.calls.key,[]);e.ctx.key('#');assert.deepEqual(e.calls.key,['#']);assert.equal(e.snapshot().state,'playing');
+});
+test('physical rocker/roller movement, wheel and keyboard arrows are navigation origins',async()=>{
+  const e=environment();await e.play();for(const type of ['click','wheel']){const target={closest:selector=>selector==='.roller-press'?null:({classList:{contains:()=>false}})};const event=e.event(type,target);assert.equal(event.stopped,true);assert.match(e.elements.get('summary').textContent,/Navigation/);}const arrow=e.event('keydown',{}, {key:'ArrowUp'});assert.equal(arrow.stopped,true);assert.deepEqual(e.calls.key,[]);
+});
+test('roller press is Select/Stop, never interpreted as movement',async()=>{
+  const e=environment();await e.play();const press={classList:{contains:c=>c==='roller-press'}};e.event('click',{closest:()=>press});assert.equal(e.adapter.stops,1);assert.equal(e.run('view'),'details');
+});
+test('pixels are cleared for every decoded frame; LCD scene is 200px high',async()=>{
+  const e=environment();await e.play();e.raf(1000);e.adapter.hex='00';e.raf(1137);const pixelLog=e.contexts[1].log;const lastClear=pixelLog.map(x=>x[0]).lastIndexOf('clearRect');assert.ok(lastClear>=0);assert.equal(pixelLog.slice(lastClear+1).filter(x=>x[0]==='fillRect').length,0);const draw=e.elements.get('display').context.log.filter(x=>x[0]==='drawImage').at(-1);assert.ok(draw[3]+draw[5]<=200);assert.equal(e.elements.get('left').attrs['aria-label'],'STOP');assert.equal(e.elements.get('back').attrs['aria-label'],'BACK');
+});
+test('transport timeout stays distinct; error has usable Back and no leaked timer',async()=>{
+  const e=environment();await e.play();e.adapter.error=Object.assign(Error('deadline'),{name:'TimeoutError'});await e.poll();assert.equal(e.snapshot().state,'error');assert.match(e.elements.get('summary').textContent,/TRANSPORT TIMEOUT/);assert.equal(e.timers.size,0);e.ctx.back();assert.equal(e.run('view'),'details');
+});
+test('late cleanup completion cannot return a newer live view to idle/details',async()=>{
+  const e=environment();await e.play();e.adapter.stopGate=deferred();e.ctx.back();await e.play();const g=e.snapshot().generation;e.adapter.stopGate.resolve(true);await flush();assert.equal(e.run('view'),'live-player');assert.equal(e.snapshot().generation,g);assert.equal(e.snapshot().state,'playing');
+});
+test('fractional configured endpoint completes without requesting an out-of-range timestamp',async()=>{
+  const e=environment();e.adapter.rangeEnd=30.15;e.adapter.end=30.15;e.adapter.complete=true;e.adapter.total=2;
+  const original=e.adapter.frameAt.bind(e.adapter);
+  e.adapter.frameAt=at=>{assert.ok(at<=30.15+1e-7,'timestamp within configured range');return original(at);};
+  await e.play();assert.equal(e.snapshot().state,'playing');e.raf(1000);e.raf(2000);assert.equal(e.snapshot().state,'ended');assert.equal(e.snapshot().presentedSourceTime,30.125);
+});
+test('wheel over roller press never selects/stops; modified wheel preserves browser zoom',async()=>{
+  const e=environment();await e.play();const press={classList:{contains:c=>c==='roller-press'}};
+  const movement=e.event('wheel',{closest:()=>press});assert.equal(movement.stopped,true);assert.equal(e.adapter.stops,0);assert.equal(e.run('view'),'live-player');
+  const zoom=e.event('wheel',{closest:()=>press},{ctrlKey:true});assert.equal(zoom.prevented,undefined);assert.equal(e.adapter.stops,0);
+});
+test('return screen captured from episodes is preserved through EOF and Back',async()=>{
+  const e=environment();e.run("view='episodes'");e.adapter.complete=true;e.adapter.total=1;e.adapter.end=30.125;
+  await e.play();e.raf(1000);e.raf(2000);assert.equal(e.snapshot().state,'ended');e.ctx.back();assert.equal(e.run('view'),'episodes');
+});
